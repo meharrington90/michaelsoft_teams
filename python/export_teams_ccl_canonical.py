@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-import io
 import json
 import re
-from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -15,10 +13,13 @@ from teams_ccl_common import (
     GUID_RE,
     classify_thread,
     clean_text,
+    decode_output_context,
     html_to_text,
     init_thread_record,
+    normalize_json_value,
     normalize_thread_id,
     parse_profile,
+    write_json,
 )
 
 EVENT_CALL_NAME_RE = re.compile(r"\b(callStarted|callEnded|callMissed|callAccepted|callRejected|callCancelled)\b", re.I)
@@ -819,19 +820,6 @@ def get_target_store(wrapper, db_prefix: str, store_name: str):
     return None
 
 
-@contextmanager
-def decode_output_context(show_decode_errors: bool):
-    if show_decode_errors:
-        yield
-        return
-
-    sink = io.StringIO()
-    with ExitStack() as stack:
-        stack.enter_context(redirect_stdout(sink))
-        stack.enter_context(redirect_stderr(sink))
-        yield
-
-
 def build_export(root: Path | str | None = None, show_decode_errors: bool = True) -> dict:
     source_info = resolve_teams_source(root)
     ccl = load_ccl()
@@ -1281,7 +1269,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
         "people_total": len(guid_to_name),
     }
 
-    return {
+    return normalize_json_value({
         "export_format": "teams-ccl-canonical-v1",
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         "source_root": str(source_info.profile_root),
@@ -1302,7 +1290,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
             "A small number of keys reported decode errors during CCL iteration and may be missing from this export.",
             "This canonical export now surfaces inline image/file attachments from replychains, but it still does not merge every auxiliary store such as full reaction history or notification surfaces.",
         ],
-    }
+    })
 
 
 def main() -> None:
@@ -1312,7 +1300,7 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = build_export(Path(args.root).resolve() if args.root else None)
-    Path(args.output).resolve().write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json(Path(args.output).resolve(), payload)
 
 
 if __name__ == "__main__":

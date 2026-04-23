@@ -1,6 +1,6 @@
 # Michaelsoft Teams
 
-Microsoft Teams is (apparently) a collaborative business platform. In practice, it's more like a padded corporate messaging container made from old Skype, Electron, bad decisions, and just enough convenience to make businesses to keep tolerating it.
+Microsoft Teams is (apparently) a collaborative business platform. In practice, it's more like a padded corporate messaging container made from old Skype, Electron, bad decisions, and just enough convenience for businesses to keep tolerating it.
 
 MSTeams stores your messages, meetings, calls, and attachment metadata locally on your machine for caching purposes (unencrypted)... which is fascinating, cause it also pretends like you're unable to copy, export, archive, or review any chat data without requesting it from your local IT Professional.
 
@@ -33,6 +33,7 @@ Michaelsoft Teams is built for:
 Michaelsoft Teams currently:
 
 - automatically discovers the current Teams profile on macOS and Windows, or accepts an explicit `--root` pointing at a copied evidence root, profile root, IndexedDB root, or `.leveldb` directory
+- refreshes a repo-local snapshot of the active Teams profile under `Library/TeamsSourceArchive/current/` on each normal run, then builds exports from that snapshot so the source data remains archived locally if the live files disappear later
 - uses `ccl_chromium_reader` to decode structured IndexedDB stores from the Teams profile and matching blob directory
 - builds a summary report, canonical JSON export, flat CSVs, per-conversation CSVs, a run manifest, and a standalone HTML viewer
 - extracts message attachments currently recoverable from replychains, including inline images, inline videos, and file/share links surfaced through message HTML or message properties
@@ -65,7 +66,7 @@ Both launchers:
 - create `.venv/` with local Python when available
 - fall back to a bundled `uv` runtime when Python is not installed
 - install dependencies on first run
-- run `python/run_teams_pipeline.py --open-browser`
+- refresh the repo-local Teams snapshot and run `python/run_teams_pipeline.py --open-browser`
 - pause at the end so you can review any errors instead of watching a terminal window vanish like a witness in a conspiracy movie
 
 After a successful run, the generated browser viewer opens automatically in your default browser.
@@ -77,3 +78,10 @@ python3 -m venv .venv
 . .venv/bin/activate
 python python/bootstrap_dependencies.py
 python python/run_teams_pipeline.py --open-browser
+```
+
+If you need to bypass the snapshot refresh and read directly from the discovered source, use:
+
+```bash
+python python/run_teams_pipeline.py --skip-source-archive
+```

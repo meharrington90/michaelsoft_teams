@@ -3,25 +3,13 @@
 import argparse
 import csv
 import json
-import re
 from pathlib import Path
 
-
-SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+from teams_ccl_common import ensure_dir, safe_name
 
 
 def load_export(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def safe_name(value: str) -> str:
-    value = SAFE_RE.sub("_", value or "")
-    value = re.sub(r"_+", "_", value).strip("_")
-    return value or "untitled"
 
 
 def sort_key(message: dict) -> tuple[bool, str, str]:
@@ -46,7 +34,6 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
     ensure_dir(messages_dir)
 
     manifest = []
-    all_rows = []
     fields = [
         "thread_id",
         "thread_label",
@@ -63,47 +50,55 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
         "content_text",
         "source",
     ]
+    ordered_threads = sorted(export_data.get("threads", []), key=lambda thread: ((thread.get("label") or ""), thread.get("id") or ""))
 
-    for thread in export_data.get("threads", []):
-        rows = []
-        for message in sorted(thread.get("messages", []), key=sort_key):
-            row = {
-                "thread_id": thread["id"],
-                "thread_label": thread.get("label"),
-                "thread_category": thread.get("category"),
-                "metadata_quality": thread.get("metadata_quality"),
-                "message_id": message.get("id"),
-                "client_message_id": message.get("client_message_id"),
-                "timestamp": message.get("timestamp"),
-                "sender_display_name": message.get("sender_display_name"),
-                "sender_id": message.get("sender_id"),
-                "message_type": message.get("message_type"),
-                "content_type": message.get("content_type"),
-                "quality": message.get("quality"),
-                "content_text": message.get("content_text"),
-                "source": message.get("source"),
-            }
-            rows.append(row)
-            all_rows.append(row)
+    with (output_dir / "conversations_all_flat.csv").open("w", newline="", encoding="utf-8") as all_handle:
+        all_writer = csv.DictWriter(all_handle, fieldnames=fields)
+        all_writer.writeheader()
 
-        filename = thread_filename(thread)
-        if rows:
-            write_csv(messages_dir / filename, fields, rows)
+        for thread in ordered_threads:
+            filename = thread_filename(thread)
+            thread_rows_written = 0
+            thread_messages = sorted(thread.get("messages", []), key=sort_key)
+            if thread_messages:
+                with (messages_dir / filename).open("w", newline="", encoding="utf-8") as thread_handle:
+                    thread_writer = csv.DictWriter(thread_handle, fieldnames=fields)
+                    thread_writer.writeheader()
 
-        manifest.append(
-            {
-                "thread_id": thread["id"],
-                "thread_label": thread.get("label"),
-                "thread_category": thread.get("category"),
-                "metadata_quality": thread.get("metadata_quality"),
-                "message_count": thread.get("message_count"),
-                "participant_count": len(thread.get("participants", [])),
-                "participants": "; ".join(thread.get("participants", [])),
-                "csv": str((messages_dir / filename).relative_to(output_dir)) if rows else "",
-            }
-        )
+                    for message in thread_messages:
+                        row = {
+                            "thread_id": thread["id"],
+                            "thread_label": thread.get("label"),
+                            "thread_category": thread.get("category"),
+                            "metadata_quality": thread.get("metadata_quality"),
+                            "message_id": message.get("id"),
+                            "client_message_id": message.get("client_message_id"),
+                            "timestamp": message.get("timestamp"),
+                            "sender_display_name": message.get("sender_display_name"),
+                            "sender_id": message.get("sender_id"),
+                            "message_type": message.get("message_type"),
+                            "content_type": message.get("content_type"),
+                            "quality": message.get("quality"),
+                            "content_text": message.get("content_text"),
+                            "source": message.get("source"),
+                        }
+                        thread_writer.writerow(row)
+                        all_writer.writerow(row)
+                        thread_rows_written += 1
 
-    write_csv(output_dir / "conversations_all_flat.csv", fields, sorted(all_rows, key=lambda row: (row["thread_label"] or "", row["timestamp"] or "", row["message_id"] or "")))
+            manifest.append(
+                {
+                    "thread_id": thread["id"],
+                    "thread_label": thread.get("label"),
+                    "thread_category": thread.get("category"),
+                    "metadata_quality": thread.get("metadata_quality"),
+                    "message_count": thread.get("message_count"),
+                    "participant_count": len(thread.get("participants", [])),
+                    "participants": "; ".join(thread.get("participants", [])),
+                    "csv": str((messages_dir / filename).relative_to(output_dir)) if thread_rows_written else "",
+                }
+            )
+
     write_csv(
         output_dir / "conversation_manifest.csv",
         ["thread_id", "thread_label", "thread_category", "metadata_quality", "message_count", "participant_count", "participants", "csv"],
@@ -142,13 +137,14 @@ def export_calls(export_data: dict, output_dir: Path) -> None:
         "summary_text",
         "source",
     ]
-    rows = []
-    for call in export_data.get("calls", []):
-        row = {field: call.get(field) for field in fields}
-        row["participant_display_names"] = "; ".join(call.get("participant_display_names", []))
-        row["participant_ids"] = "; ".join(call.get("participant_ids", []))
-        rows.append(row)
-    write_csv(output_dir / "call_history.csv", fields, rows)
+    with (output_dir / "call_history.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for call in export_data.get("calls", []):
+            row = {field: call.get(field) for field in fields}
+            row["participant_display_names"] = "; ".join(call.get("participant_display_names", []))
+            row["participant_ids"] = "; ".join(call.get("participant_ids", []))
+            writer.writerow(row)
 
 
 def main() -> None:

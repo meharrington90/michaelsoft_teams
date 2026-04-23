@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
+import io
+import json
 import re
+from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from html import unescape
 from pathlib import Path
+from typing import Any
 
 
 THREAD_ID_PATTERN = (
@@ -20,14 +24,23 @@ PROFILE_RE = re.compile(
     r'"displayName":"([^"]+)".+?"email":"([^"]+)".+?"tenantId":"([^"]+)".+?"oid":"([^"]+)"',
     re.S,
 )
+SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def read_text(path: Path) -> str:
     return path.read_bytes().decode("utf-8", "ignore")
 
 
-def clean_value(value: str | None) -> str | None:
-    if value is None:
+def is_undefined_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return value == "<Undefined>"
+    return value is not None and value.__class__.__name__ == "_Undefined"
+
+
+def clean_value(value: Any) -> str | None:
+    if value is None or is_undefined_value(value):
+        return None
+    if not isinstance(value, str):
         return None
     value = CONTROL_RE.sub("", value)
     value = value.replace("\x00", "")
@@ -50,6 +63,50 @@ def html_to_text(value: str | None) -> str | None:
     value = HTML_TAG_RE.sub(" ", value)
     value = unescape(value)
     return clean_text(value)
+
+
+def safe_name(value: str | None, default: str = "untitled") -> str:
+    cleaned = SAFE_NAME_RE.sub("_", value or "")
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    return cleaned or default
+
+
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def normalize_json_value(value: Any) -> Any:
+    if is_undefined_value(value):
+        return None
+    if isinstance(value, dict):
+        return {str(key): normalize_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [normalize_json_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [normalize_json_value(item) for item in value]
+    return value
+
+
+def write_json(path: Path, payload: Any, *, pretty: bool = True) -> None:
+    kwargs = {"ensure_ascii": False}
+    if pretty:
+        kwargs["indent"] = 2
+    else:
+        kwargs["separators"] = (",", ":")
+    path.write_text(json.dumps(normalize_json_value(payload), **kwargs), encoding="utf-8")
+
+
+@contextmanager
+def decode_output_context(show_decode_errors: bool):
+    if show_decode_errors:
+        yield
+        return
+
+    sink = io.StringIO()
+    with ExitStack() as stack:
+        stack.enter_context(redirect_stdout(sink))
+        stack.enter_context(redirect_stderr(sink))
+        yield
 
 
 def normalize_thread_id(value: str | None) -> str | None:

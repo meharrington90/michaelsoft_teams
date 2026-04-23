@@ -2,17 +2,9 @@
 
 import argparse
 import json
-import re
 from pathlib import Path
 
-
-SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
-
-
-def safe_name(value: str) -> str:
-    value = SAFE_RE.sub("_", value or "")
-    value = re.sub(r"_+", "_", value).strip("_")
-    return value or "untitled"
+from teams_ccl_common import safe_name
 
 
 def thread_csv_path(thread: dict) -> str:
@@ -1515,7 +1507,7 @@ HTML_TEMPLATE = """<!doctype html>
               <span>To</span>
               <input id="messageDateTo" type="date" value="">
             </label>
-            <button id="clearMessageDateRange" type="button" class="call-link range-action">Clear Range</button>
+            <button id="clearMessageDateRange" type="button" class="call-link range-action">Clear Filters</button>
           </div>
         </div>
         <div id="callsTools" class="toolbar hidden">
@@ -1543,7 +1535,7 @@ HTML_TEMPLATE = """<!doctype html>
               <span>To</span>
               <input id="callDateTo" type="date" value="">
             </label>
-            <button id="clearCallDateRange" type="button" class="call-link range-action">Clear Range</button>
+            <button id="clearCallDateRange" type="button" class="call-link range-action">Clear Filters</button>
           </div>
         </div>
         <div class="chip-row">
@@ -1603,8 +1595,10 @@ HTML_TEMPLATE = """<!doctype html>
       expandHiddenData: false,
       threadId: null,
       callKey: null,
+      focusMessageId: null,
       focusCallKey: null,
       focusTimestamp: null,
+      focusSearchQuery: "",
     };
 
     const appShell = document.querySelector(".app");
@@ -2447,6 +2441,44 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
+    function scrollSidebarToTop() {
+      window.requestAnimationFrame(() => {
+        if (sidebarListWrap) {
+          sidebarListWrap.scrollTop = 0;
+          sidebarListWrap.scrollTo({ top: 0, behavior: "auto" });
+        }
+        scheduleSyncScrollTopButtons();
+      });
+    }
+
+    function scrollAllToTop() {
+      scrollSidebarToTop();
+      scrollMainToTop();
+    }
+
+    function centerElementInContainer(container, element, behavior = "smooth") {
+      if (!element) return;
+      if (!container || container === document.body || container === document.documentElement) {
+        element.scrollIntoView({ block: "center", inline: "nearest", behavior });
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const rawTop = container.scrollTop + (elementRect.top - containerRect.top) - ((container.clientHeight - elementRect.height) / 2);
+      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const nextTop = Math.max(0, Math.min(maxTop, rawTop));
+      container.scrollTo({ top: nextTop, behavior });
+    }
+
+    function centerElementAfterLayout(container, element, behavior = "smooth") {
+      if (!element) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          centerElementInContainer(container, element, behavior);
+        });
+      });
+    }
+
     function updateScrollTopButton(button, container) {
       if (!button || !container) return;
       const canScroll = container.scrollHeight > container.clientHeight + 24;
@@ -2807,6 +2839,10 @@ HTML_TEMPLATE = """<!doctype html>
     function clearMessageSearchState() {
       state.messageSearch = "";
       if (messageSearch) messageSearch.value = "";
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
       window.clearTimeout(scheduleSearchGroupsComputation.timer);
       scheduleSearchGroupsComputation.pendingSignature = "";
     }
@@ -2830,24 +2866,24 @@ HTML_TEMPLATE = """<!doctype html>
         state.threadDateFrom = "";
         state.threadDateTo = "";
       }
+      state.focusMessageId = options.focusMessageId || null;
       state.focusTimestamp = options.focusTimestamp || null;
       state.focusCallKey = options.focusCallKey || null;
+      state.focusSearchQuery = String(options.focusSearchQuery || "").trim();
       renderView();
       if (options.revealInSidebar) {
-        revealActiveListRow(threadList);
+        revealActiveListRow(threadList, { behavior: options.scrollBehavior || "smooth" });
       }
       if (options.scrollTop) {
         scrollMainToTop();
       }
     }
 
-    function revealActiveListRow(scope) {
+    function revealActiveListRow(scope, options = {}) {
       if (!scope) return;
       const activeRow = scope.querySelector(".list-row.active");
       if (!activeRow) return;
-      window.requestAnimationFrame(() => {
-        activeRow.scrollIntoView({ block: "nearest", inline: "nearest" });
-      });
+      centerElementAfterLayout(sidebarListWrap, activeRow, options.behavior || "smooth");
     }
 
     function moveSidebarSelection(direction) {
@@ -2859,8 +2895,10 @@ HTML_TEMPLATE = """<!doctype html>
         if (index < 0) index = 0;
         index = Math.max(0, Math.min(rows.length - 1, index + direction));
         state.threadId = rows[index].id;
+        state.focusMessageId = null;
         state.focusCallKey = null;
         state.focusTimestamp = null;
+        state.focusSearchQuery = "";
         renderView();
         revealActiveListRow(threadList);
         scrollMainToTop();
@@ -2913,34 +2951,25 @@ HTML_TEMPLATE = """<!doctype html>
 
     function threadSearchText(thread) {
       const cacheKey = String(thread && thread.id || "");
-      if (!hasSidebarMessageDateRange() && cacheKey && THREAD_SEARCH_TEXT_CACHE.has(cacheKey)) {
+      if (cacheKey && THREAD_SEARCH_TEXT_CACHE.has(cacheKey)) {
         return THREAD_SEARCH_TEXT_CACHE.get(cacheKey);
       }
-      const displayLabel = threadDisplayLabel(thread);
-      const messageTerms = visibleSidebarThreadMessages(thread).slice(0, 100).flatMap(message => [
-        message.content_text || "",
-        message.content_html || "",
-        displayMessageType(message),
-        ...messageAttachments(message).map(attachment => attachment.name || ""),
-      ]);
       const parts = [
         thread.label,
-        displayLabel,
+        threadDisplayLabel(thread),
         thread.id,
         thread.category,
         ...(thread.participants || []),
-        ...messageTerms,
-        ...syntheticCallsForThread(thread).slice(0, 40).map(call => call.summary_text || call.call_state || call.call_type || ""),
       ];
       const value = parts.filter(Boolean).join(" ").toLowerCase();
-      if (!hasSidebarMessageDateRange() && cacheKey) {
+      if (cacheKey) {
         THREAD_SEARCH_TEXT_CACHE.set(cacheKey, value);
       }
       return value;
     }
 
-    function searchTerms() {
-      return [...new Set(String(state.messageSearch || "")
+    function searchTermsForQuery(queryText) {
+      return [...new Set(String(queryText || "")
         .trim()
         .toLowerCase()
         .split(" ")
@@ -2948,14 +2977,42 @@ HTML_TEMPLATE = """<!doctype html>
         .filter(Boolean))];
     }
 
-    function textMatchesSearch(text) {
+    function searchTerms() {
+      return searchTermsForQuery(state.messageSearch);
+    }
+
+    function textMatchesQuery(text, queryText) {
       const haystack = String(text || "").toLowerCase();
-      const query = String(state.messageSearch || "").trim().toLowerCase();
+      const query = String(queryText || "").trim().toLowerCase();
       if (!query) return true;
       if (!haystack) return false;
       if (haystack.includes(query)) return true;
-      const terms = searchTerms();
+      const terms = searchTermsForQuery(queryText);
       return terms.length > 1 && terms.every(term => haystack.includes(term));
+    }
+
+    function textMatchesSearch(text) {
+      return textMatchesQuery(text, state.messageSearch);
+    }
+
+    function latestMatchingSearchMessage(thread, queryText = state.messageSearch) {
+      if (!String(queryText || "").trim()) return null;
+      for (const message of sortedThreadTimelineItems(thread)) {
+        if (!messagePassesSidebarDateRange(message)) continue;
+        if (!includeMessageInSearchResults(message)) continue;
+        if (textMatchesQuery(searchMessageText(thread, message), queryText)) {
+          return message;
+        }
+      }
+      return null;
+    }
+
+    function threadMatchesSearch(thread) {
+      if (!state.messageSearch) return true;
+      if (textMatchesSearch(threadSearchText(thread))) {
+        return true;
+      }
+      return Boolean(latestMatchingSearchMessage(thread));
     }
 
     function threadNameSearchPriority(thread) {
@@ -3027,9 +3084,9 @@ HTML_TEMPLATE = """<!doctype html>
       return (thread.messages || []).filter(messagePassesSidebarDateRange);
     }
 
-    function highlightSearchHtml(value) {
+    function highlightSearchHtml(value, queryText = state.messageSearch) {
       const text = String(value ?? "");
-      const terms = searchTerms().sort((left, right) => right.length - left.length);
+      const terms = searchTermsForQuery(queryText).sort((left, right) => right.length - left.length);
       if (!text || !terms.length) return escapeHtml(text);
 
       const lower = text.toLowerCase();
@@ -3171,7 +3228,7 @@ HTML_TEMPLATE = """<!doctype html>
             return false;
           }
           if (visibleSidebarThreadMessages(thread).length === 0) return false;
-          if (state.messageSearch && !textMatchesSearch(threadSearchText(thread))) return false;
+          if (!threadMatchesSearch(thread)) return false;
           return true;
         })
         .sort((left, right) => {
@@ -4256,9 +4313,16 @@ HTML_TEMPLATE = """<!doctype html>
       const base = (message.attachments || [])
         .map(normalizeAttachmentRecord)
         .filter(Boolean);
+      const htmlFallback = [];
+      if (!base.length) {
+        const rawHtml = String(message.content_html || "");
+        if (rawHtml && (rawHtml.includes("itemtype=") || rawHtml.includes("<img") || rawHtml.includes("<a"))) {
+          htmlFallback.push(...extractAttachmentsFromHtml(rawHtml));
+        }
+      }
       const combined = [];
       const seen = new Set();
-      for (const record of [...base, ...extractAttachmentsFromHtml(message.content_html || "")]) {
+      for (const record of [...base, ...htmlFallback]) {
         const key = [record.id, record.url, record.preview_url, record.name].join("|");
         if (seen.has(key)) continue;
         seen.add(key);
@@ -4389,6 +4453,29 @@ HTML_TEMPLATE = """<!doctype html>
       if (messageDateTo) messageDateTo.value = "";
     }
 
+    function hasMessageFilters() {
+      return Boolean(
+        state.messageSearch ||
+        state.category ||
+        state.messageDateFrom ||
+        state.messageDateTo ||
+        state.threadDateFrom ||
+        state.threadDateTo ||
+        (state.messageViewFilter && state.messageViewFilter !== "all")
+      );
+    }
+
+    function clearMessageFilters() {
+      clearMessageSearchState();
+      state.category = "";
+      clearAllMessageDateRanges();
+      state.messageViewFilter = "all";
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
+    }
+
     function normalizedCallDateRange() {
       const start = dateBoundaryValue(state.callDateFrom, false);
       const end = dateBoundaryValue(state.callDateTo, true);
@@ -4409,9 +4496,33 @@ HTML_TEMPLATE = """<!doctype html>
       return true;
     }
 
+    function hasCallFilters() {
+      return Boolean(
+        state.callSearch ||
+        state.callGroup ||
+        state.callDirection ||
+        state.callDateFrom ||
+        state.callDateTo
+      );
+    }
+
+    function clearCallFilters() {
+      state.callSearch = "";
+      state.callGroup = "";
+      state.callDirection = "";
+      state.callDateFrom = "";
+      state.callDateTo = "";
+      if (callSearch) callSearch.value = "";
+      if (callGroupFilter) callGroupFilter.value = "";
+      if (callDirectionFilter) callDirectionFilter.value = "";
+      if (callDateFrom) callDateFrom.value = "";
+      if (callDateTo) callDateTo.value = "";
+    }
+
     function callSearchText(call) {
       const key = callKey(call);
       if (CALL_SEARCH_TEXT_CACHE.has(key)) return CALL_SEARCH_TEXT_CACHE.get(key);
+      const participantEntries = callParticipantEntries(call);
       const parts = [
         callLabel(call),
         call.call_id,
@@ -4439,6 +4550,8 @@ HTML_TEMPLATE = """<!doctype html>
         call.target_id,
         call.target_endpoint,
         call.target_phone_number,
+        ...participantEntries.map(entry => entry.label || entry.name || ""),
+        ...participantEntries.map(entry => entry.id || ""),
       ];
       const value = parts.filter(Boolean).join(" ").toLowerCase();
       CALL_SEARCH_TEXT_CACHE.set(key, value);
@@ -4491,7 +4604,6 @@ HTML_TEMPLATE = """<!doctype html>
       if (MESSAGE_SEARCH_TEXT_CACHE.has(message)) {
         return MESSAGE_SEARCH_TEXT_CACHE.get(message);
       }
-      const linkedCall = findLinkedCall(message);
       const attachments = messageAttachments(message);
       const parts = [
         thread.label,
@@ -4507,17 +4619,6 @@ HTML_TEMPLATE = """<!doctype html>
         ...attachments.map(attachment => attachment.name),
         ...attachments.map(attachment => attachment.url),
       ];
-      if (linkedCall) {
-        parts.push(
-          callLabel(linkedCall),
-          linkedCall.call_type,
-          linkedCall.call_state,
-          linkedCall.direction,
-          linkedCall.summary_text,
-          linkedCall.originator_display_name,
-          linkedCall.target_display_name,
-        );
-      }
       if (message.message_type === "ThreadActivity/AddMember") {
         const parsed = parseAddMemberEvent(message);
         parts.push(parsed.actorName, ...(parsed.addedNames || []));
@@ -4540,11 +4641,11 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function includeMessageInSearchResults(message) {
-      if (!message) return false;
-      return true;
+      return Boolean(message && !messageIsCallEvent(message) && !messageIsSystemEventRecord(message));
     }
 
-    function renderMessageBody(message, thread, useHighlight = false) {
+    function renderMessageBody(message, thread, highlightQuery = "") {
+      const useHighlight = Boolean(String(highlightQuery || "").trim());
       if (messageIsCallEvent(message)) {
         return renderCallEventBody(message);
       }
@@ -4553,15 +4654,16 @@ HTML_TEMPLATE = """<!doctype html>
       }
       if (messageHasAttachments(message)) {
         const textHtml = message.content_text
-          ? `<div class="body-text">${useHighlight ? highlightSearchHtml(message.content_text || "") : escapeHtml(message.content_text || "")}</div>`
+          ? `<div class="body-text">${useHighlight ? highlightSearchHtml(message.content_text || "", highlightQuery) : escapeHtml(message.content_text || "")}</div>`
           : ``;
         return `<div class="body attachment-body">${textHtml}${renderAttachmentCards(message)}</div>`;
       }
-      return `<div class="body">${useHighlight ? highlightSearchHtml(message.content_text || "") : escapeHtml(message.content_text || "")}</div>`;
+      return `<div class="body">${useHighlight ? highlightSearchHtml(message.content_text || "", highlightQuery) : escapeHtml(message.content_text || "")}</div>`;
     }
 
     function renderMessageRow(message, thread, options = {}) {
-      const useHighlight = Boolean(options.highlight);
+      const highlightQuery = String(options.highlightQuery || (options.highlight ? state.messageSearch : "") || "").trim();
+      const useHighlight = Boolean(highlightQuery);
       const isFocused = Boolean(options.focused);
       const isSearchMatch = Boolean(options.searchMatch);
       const groupedWithPrevious = Boolean(options.groupedWithPrevious);
@@ -4577,12 +4679,12 @@ HTML_TEMPLATE = """<!doctype html>
         isSearchMatch ? "search-match" : "",
       ].filter(Boolean).join(" ");
       const senderHtml = useHighlight
-        ? highlightSearchHtml(senderLabel)
+        ? highlightSearchHtml(senderLabel, highlightQuery)
         : escapeHtml(senderLabel);
       const typeHtml = useHighlight
-        ? highlightSearchHtml(displayMessageType(message))
+        ? highlightSearchHtml(displayMessageType(message), highlightQuery)
         : escapeHtml(displayMessageType(message));
-      const bodyHtml = renderMessageBody(message, thread, useHighlight);
+      const bodyHtml = renderMessageBody(message, thread, highlightQuery);
       const hiddenMeta = messageHiddenMeta(message);
       const collapsibleSystemEvent = systemMessage && !messageIsCallEvent(message);
       const hasCollapsibleContent = Boolean((hiddenMeta && hiddenMeta.count > 0) || collapsibleSystemEvent);
@@ -4591,7 +4693,7 @@ HTML_TEMPLATE = """<!doctype html>
         isFocused ||
         (collapsibleSystemEvent && isSearchMatch)
       );
-      const shellAttrs = `class="${escapeHtml(classes)}${hasCollapsibleContent ? " msg-collapsible" : ""}" data-call-key="${escapeHtml(messageLinkedCallKey(message))}" data-timestamp="${escapeHtml(String(timeValue(message.timestamp)))}"`;
+      const shellAttrs = `class="${escapeHtml(classes)}${hasCollapsibleContent ? " msg-collapsible" : ""}" data-message-id="${escapeHtml(message.id || "")}" data-call-key="${escapeHtml(messageLinkedCallKey(message))}" data-timestamp="${escapeHtml(String(timeValue(message.timestamp)))}"`;
       const rowClasses = [
         "msg-row",
         selfMessage ? "self" : "",
@@ -4717,7 +4819,6 @@ HTML_TEMPLATE = """<!doctype html>
       for (const thread of filteredThreads()) {
         const timeline = sortedThreadTimelineItems(thread)
           .filter(messagePassesSidebarDateRange)
-          .filter(messagePassesFilter)
           .filter(includeMessageInSearchResults);
 
         const hits = [];
@@ -4746,8 +4847,9 @@ HTML_TEMPLATE = """<!doctype html>
           groups.push({
             thread,
             hitCount: cluster.hitCount,
+            focusMessageId: focusMessage.id || "",
             focusTimestamp: focusMessage.timestamp || "",
-            focusCallKey: messageLinkedCallKey(focusMessage),
+            focusCallKey: "",
             viewFilter: "all",
             messages: timeline.slice(cluster.start, cluster.end + 1),
           });
@@ -4836,12 +4938,13 @@ HTML_TEMPLATE = """<!doctype html>
                   <div><strong>${escapeHtml(threadDisplayLabel(group.thread))}</strong></div>
                   <div class="search-group-meta">${escapeHtml(prettyCategory(group.thread.category))} | ${escapeHtml(fmt(group.focusTimestamp))} | ${escapeHtml(String(group.hitCount))} match${group.hitCount === 1 ? "" : "es"}</div>
                 </div>
-                <button type="button" class="call-link open-search-thread" data-thread-id="${escapeHtml(group.thread.id)}" data-focus-time="${escapeHtml(group.focusTimestamp || "")}" data-focus-call-key="${escapeHtml(group.focusCallKey || "")}" data-view-filter="${escapeHtml(group.viewFilter || "all")}">Open In Chats</button>
+                <button type="button" class="call-link open-search-thread" data-thread-id="${escapeHtml(group.thread.id)}" data-focus-message-id="${escapeHtml(group.focusMessageId || "")}" data-focus-time="${escapeHtml(group.focusTimestamp || "")}" data-focus-call-key="${escapeHtml(group.focusCallKey || "")}" data-view-filter="${escapeHtml(group.viewFilter || "all")}">Open In Chats</button>
               </div>
               <div class="messages">
                 ${renderTimeline(group.messages, group.thread, {
                   messageOptions: message => ({
-                    highlight: true,
+                    highlightQuery: state.messageSearch,
+                    focused: group.focusMessageId && message.id === group.focusMessageId,
                     searchMatch: textMatchesSearch(searchMessageText(group.thread, message)),
                   }),
                 })}
@@ -4860,8 +4963,10 @@ HTML_TEMPLATE = """<!doctype html>
           openThreadView({
             threadId: element.dataset.threadId,
             clearSearch: true,
+            focusMessageId: element.dataset.focusMessageId || null,
             focusTimestamp: element.dataset.focusTime || null,
             focusCallKey: element.dataset.focusCallKey || null,
+            focusSearchQuery: state.messageSearch,
             revealInSidebar: true,
           });
         });
@@ -4941,7 +5046,7 @@ HTML_TEMPLATE = """<!doctype html>
               <span>To</span>
               <input type="date" class="thread-date-to" value="${escapeHtml(state.threadDateTo)}">
             </label>
-            <button type="button" class="call-link clear-date-range"${(hasThreadDateRange() || hasSidebarMessageDateRange()) ? "" : " disabled"}>Clear Range</button>
+            <button type="button" class="call-link clear-date-range"${hasMessageFilters() ? "" : " disabled"}>Clear Filters</button>
           </div>
           <div class="toolbar-divider"></div>
         </div>
@@ -4965,7 +5070,14 @@ HTML_TEMPLATE = """<!doctype html>
         <div class="messages">
           ${renderTimeline(messages, thread, {
             messageOptions: message => ({
-              focused: state.focusCallKey && messageLinkedCallKey(message) === state.focusCallKey,
+              highlightQuery: state.focusSearchQuery,
+              focused: Boolean(
+                (state.focusMessageId && message.id === state.focusMessageId) ||
+                (!state.focusMessageId && state.focusCallKey && messageLinkedCallKey(message) === state.focusCallKey)
+              ),
+              searchMatch: state.focusSearchQuery
+                ? textMatchesQuery(searchMessageText(thread, message), state.focusSearchQuery)
+                : false,
             }),
           }) || `<div class="empty">${(hasThreadDateRange() || hasSidebarMessageDateRange()) ? "No timeline items match the current date range and filters." : "No messages in this conversation."}</div>`}
         </div>
@@ -4996,8 +5108,9 @@ HTML_TEMPLATE = """<!doctype html>
       const clearDateRange = contentPanel.querySelector(".clear-date-range");
       if (clearDateRange) {
         clearDateRange.addEventListener("click", () => {
-          clearAllMessageDateRanges();
+          clearMessageFilters();
           renderView();
+          scrollAllToTop();
         });
       }
       const copyThreadId = contentPanel.querySelector(".copy-thread-id");
@@ -5041,9 +5154,12 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function focusThreadPosition() {
-      if (!state.focusCallKey && !state.focusTimestamp) return;
+      if (!state.focusMessageId && !state.focusCallKey && !state.focusTimestamp) return;
       let target = null;
-      if (state.focusCallKey) {
+      if (state.focusMessageId) {
+        target = contentPanel.querySelector(`.msg[data-message-id="${CSS.escape(state.focusMessageId)}"]`);
+      }
+      if (!target && state.focusCallKey) {
         target = contentPanel.querySelector(`.msg[data-call-key="${CSS.escape(state.focusCallKey)}"]`);
       }
       if (!target && state.focusTimestamp) {
@@ -5057,10 +5173,10 @@ HTML_TEMPLATE = """<!doctype html>
             target = element;
           }
         }
-        if (target) target.classList.add("focused");
       }
       if (target) {
-        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        target.classList.add("focused");
+        centerElementAfterLayout(mainScrollWrap, target.closest(".msg-row") || target, "smooth");
       }
     }
 
@@ -5197,13 +5313,19 @@ HTML_TEMPLATE = """<!doctype html>
 
     viewMessages.addEventListener("click", () => {
       state.view = "messages";
+      state.focusMessageId = null;
       state.focusCallKey = null;
       state.focusTimestamp = null;
+      state.focusSearchQuery = "";
       renderView();
     });
 
     viewCalls.addEventListener("click", () => {
       state.view = "calls";
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
       renderView();
     });
 
@@ -5211,19 +5333,26 @@ HTML_TEMPLATE = """<!doctype html>
       const row = event.target.closest(".list-row[data-id]");
       if (!row || !threadList.contains(row)) return;
       if (state.messageSearch) {
+        const thread = THREAD_BY_ID.get(row.dataset.id);
+        const latestMatch = thread ? latestMatchingSearchMessage(thread) : null;
         openThreadView({
           threadId: row.dataset.id,
           clearSearch: true,
+          focusMessageId: latestMatch && latestMatch.id ? latestMatch.id : null,
+          focusTimestamp: latestMatch ? (latestMatch.timestamp || null) : null,
+          focusSearchQuery: state.messageSearch,
           revealInSidebar: true,
-          scrollTop: true,
+          scrollTop: !latestMatch,
         });
         return;
       }
       state.threadId = row.dataset.id;
       state.threadDateFrom = state.messageDateFrom || "";
       state.threadDateTo = state.messageDateTo || "";
+      state.focusMessageId = null;
       state.focusCallKey = null;
       state.focusTimestamp = null;
+      state.focusSearchQuery = "";
       renderView();
       scrollMainToTop();
     });
@@ -5238,6 +5367,10 @@ HTML_TEMPLATE = """<!doctype html>
     messageSearch.addEventListener("input", event => {
       const nextValue = String(event.target.value || "");
       state.messageSearch = nextValue.trim() ? nextValue : "";
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
       scheduleMessageSearchRender();
     });
 
@@ -5265,8 +5398,9 @@ HTML_TEMPLATE = """<!doctype html>
     });
 
     clearMessageDateRange.addEventListener("click", () => {
-      clearAllMessageDateRanges();
+      clearMessageFilters();
       renderView();
+      scrollAllToTop();
     });
 
     callSearch.addEventListener("input", event => {
@@ -5295,11 +5429,9 @@ HTML_TEMPLATE = """<!doctype html>
     });
 
     clearCallDateRange.addEventListener("click", () => {
-      state.callDateFrom = "";
-      state.callDateTo = "";
-      callDateFrom.value = "";
-      callDateTo.value = "";
+      clearCallFilters();
       renderView();
+      scrollAllToTop();
     });
 
     if (sidebarListWrap) {
@@ -5499,12 +5631,12 @@ MESSAGE_FIELDS = (
     "sender_display_name",
     "sender_id",
     "message_type",
-    "content_html",
     "content_text",
     "attachments",
     "quality",
 )
 MESSAGE_ATTACHMENT_FIELDS = ("id", "name", "url", "preview_url", "kind")
+MESSAGE_HTML_TYPES = frozenset({"ThreadActivity/TopicUpdate"})
 CALL_FIELDS = (
     "call_id",
     "call_state",
@@ -5543,22 +5675,24 @@ def pick_fields(payload: dict | None, allowed_fields: tuple[str, ...]) -> dict:
     return {key: source[key] for key in allowed_fields if key in source}
 
 
-def build_browser(export_data: dict, output_path: Path) -> None:
+def build_message_payload(message: dict) -> dict:
+    row = pick_fields(message, MESSAGE_FIELDS)
+    if message.get("message_type") in MESSAGE_HTML_TYPES and message.get("content_html"):
+        row["content_html"] = message["content_html"]
+    row["attachments"] = [
+        pick_fields(attachment, MESSAGE_ATTACHMENT_FIELDS)
+        for attachment in (message.get("attachments") or [])
+    ]
+    return row
+
+
+def build_browser_payload(export_data: dict) -> dict:
     threads = []
     for thread in export_data.get("threads") or []:
         row = pick_fields(thread, THREAD_FIELDS)
         row["metadata"] = pick_fields(row.get("metadata"), THREAD_METADATA_FIELDS)
         row["meeting"] = pick_fields(row.get("meeting"), THREAD_MEETING_FIELDS)
-        row["messages"] = [
-            {
-                **pick_fields(message, MESSAGE_FIELDS),
-                "attachments": [
-                    pick_fields(attachment, MESSAGE_ATTACHMENT_FIELDS)
-                    for attachment in (message.get("attachments") or [])
-                ],
-            }
-            for message in (thread.get("messages") or [])
-        ]
+        row["messages"] = [build_message_payload(message) for message in (thread.get("messages") or [])]
         row["csv_path"] = thread_csv_path(thread)
         threads.append(row)
 
@@ -5571,13 +5705,17 @@ def build_browser(export_data: dict, output_path: Path) -> None:
         ]
         calls.append(row)
 
-    payload = {
+    return {
         "summary": pick_fields(export_data.get("summary"), SUMMARY_FIELDS),
         "profile": pick_fields(export_data.get("profile"), PROFILE_FIELDS),
         "threads": threads,
         "calls": calls,
         "guid_directory": export_data.get("guid_directory") or {},
     }
+
+
+def build_browser(export_data: dict, output_path: Path) -> None:
+    payload = build_browser_payload(export_data)
     html = HTML_TEMPLATE.replace("__DATA__", json.dumps(payload, ensure_ascii=False))
     output_path.write_text(html, encoding="utf-8")
 

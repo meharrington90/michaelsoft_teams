@@ -5,6 +5,7 @@ __pycache__/
 .venv-ccl/
 
 Library/
+Library/TeamsSourceArchive/
 teams_pipeline_output*/
 teams_ccl_summary.json
 teams_ccl_canonical_v1.json

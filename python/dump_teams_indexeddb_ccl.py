@@ -4,8 +4,10 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,8 @@ from typing import Any
 TARGET_LEVELDB_DIR = "https_teams.microsoft.com_0.indexeddb.leveldb"
 TARGET_BLOB_DIR = "https_teams.microsoft.com_0.indexeddb.blob"
 PROFILE_PRIORITY = {"WV2Profile_tfw": 0, "Default": 1}
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ARCHIVE_ROOT = REPO_ROOT / "Library" / "TeamsSourceArchive"
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,16 @@ class TeamsSourcePaths:
     discovery_method: str
 
 
+@dataclass(frozen=True)
+class PreparedTeamsSource:
+    active_source: TeamsSourcePaths
+    live_source: TeamsSourcePaths | None
+    archive_root: Path | None
+    archive_manifest_path: Path | None
+    used_archive: bool
+    refreshed_archive: bool
+
+
 def detect_platform() -> str:
     system = platform.system().lower()
     if system == "darwin":
@@ -33,6 +47,35 @@ def detect_platform() -> str:
     if system == "windows":
         return "windows"
     return system or "unknown"
+
+
+def default_archive_root() -> Path:
+    return SOURCE_ARCHIVE_ROOT
+
+
+def archive_current_root(archive_root: Path | None = None) -> Path:
+    base = Path(archive_root).expanduser().resolve() if archive_root else default_archive_root()
+    return base / "current"
+
+
+def archive_profile_root(archive_root: Path | None = None) -> Path:
+    return archive_current_root(archive_root) / "profile"
+
+
+def archive_manifest_path(archive_root: Path | None = None) -> Path:
+    return archive_current_root(archive_root) / "archive_manifest.json"
+
+
+def path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def is_archive_source(path: Path, archive_root: Path | None = None) -> bool:
+    return path_is_within(path, archive_current_root(archive_root))
 
 
 def default_search_roots() -> list[Path]:
@@ -58,6 +101,10 @@ def default_search_roots() -> list[Path]:
         return roots
 
     return []
+
+
+def source_candidates(root: Path | str | None = None) -> list[Path]:
+    return [Path(root).expanduser()] if root is not None else default_search_roots()
 
 
 def candidate_profile_dirs(search_root: Path) -> list[Path]:
@@ -135,13 +182,9 @@ def discover_from_root(search_root: Path) -> TeamsSourcePaths | None:
     return None
 
 
-def resolve_teams_source(root: Path | str | None = None) -> TeamsSourcePaths:
-    candidates = [Path(root).expanduser()] if root else default_search_roots()
+def resolve_source_from_candidates(candidates: list[Path], missing_message: str) -> TeamsSourcePaths:
     if not candidates:
-        raise SystemExit(
-            "Unable to determine a default Teams data location for this platform.\n"
-            "Pass --root with a Teams profile root, copied evidence root, or IndexedDB path."
-        )
+        raise SystemExit(missing_message)
 
     for candidate in candidates:
         result = discover_from_root(candidate)
@@ -155,6 +198,173 @@ def resolve_teams_source(root: Path | str | None = None) -> TeamsSourcePaths:
         f"{searched}\n"
         f"Expected to find a `{TARGET_LEVELDB_DIR}` directory under one of them."
     )
+
+
+def resolve_live_teams_source(root: Path | str | None = None) -> TeamsSourcePaths:
+    return resolve_source_from_candidates(
+        source_candidates(root),
+        "Unable to determine a default Teams data location for this platform.\n"
+        "Pass --root with a Teams profile root, copied evidence root, or IndexedDB path.",
+    )
+
+
+def discover_archive_source(archive_root: Path | None = None) -> TeamsSourcePaths | None:
+    current_root = archive_current_root(archive_root)
+    for candidate in [archive_profile_root(archive_root), current_root]:
+        result = discover_from_root(candidate)
+        if result is not None:
+            return build_source_paths(result.leveldb_path, current_root, "repo-archive-fallback")
+    return None
+
+
+def load_archive_manifest(archive_root: Path | None = None) -> dict | None:
+    path = archive_manifest_path(archive_root)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def refresh_source_archive(source: TeamsSourcePaths, archive_root: Path | None = None) -> TeamsSourcePaths:
+    if is_archive_source(source.profile_root, archive_root):
+        return source
+
+    base = Path(archive_root).expanduser().resolve() if archive_root else default_archive_root()
+    current_root = archive_current_root(base)
+    staging_root = base / ".staging"
+    previous_root = base / ".previous"
+    base.mkdir(parents=True, exist_ok=True)
+    if staging_root.exists():
+        shutil.rmtree(staging_root)
+    if previous_root.exists():
+        shutil.rmtree(previous_root)
+
+    staging_root.mkdir(parents=True, exist_ok=True)
+    staging_profile = staging_root / "profile"
+    shutil.copytree(source.profile_root, staging_profile, copy_function=shutil.copy2)
+
+    metadata = {
+        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "platform": source.platform_name,
+        "search_root": str(source.search_root),
+        "source_root": str(source.profile_root),
+        "leveldb_path": str(source.leveldb_path),
+        "blob_path": str(source.blob_path) if source.blob_path.exists() else None,
+        "local_storage_dir": str(source.local_storage_dir) if source.local_storage_dir else None,
+        "discovery_method": source.discovery_method,
+        "archive_profile_root": str(archive_profile_root(base)),
+    }
+    (staging_root / "archive_manifest.json").write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    try:
+        if current_root.exists():
+            current_root.rename(previous_root)
+        staging_root.rename(current_root)
+    except Exception:
+        if current_root.exists():
+            shutil.rmtree(current_root)
+        if previous_root.exists():
+            previous_root.rename(current_root)
+        raise
+    else:
+        if previous_root.exists():
+            shutil.rmtree(previous_root)
+    finally:
+        if staging_root.exists():
+            shutil.rmtree(staging_root)
+
+    archived_leveldb = archive_profile_root(base) / "IndexedDB" / TARGET_LEVELDB_DIR
+    return build_source_paths(archived_leveldb, current_root, "repo-archive-refresh")
+
+
+def prepare_pipeline_source(
+    root: Path | str | None = None,
+    *,
+    refresh_archive: bool = True,
+    archive_root: Path | None = None,
+) -> PreparedTeamsSource:
+    archive_base = Path(archive_root).expanduser().resolve() if archive_root else default_archive_root()
+
+    if root is not None:
+        resolved = resolve_live_teams_source(root)
+        if refresh_archive and not is_archive_source(resolved.profile_root, archive_base):
+            archived = refresh_source_archive(resolved, archive_base)
+            return PreparedTeamsSource(
+                active_source=archived,
+                live_source=resolved,
+                archive_root=archive_base,
+                archive_manifest_path=archive_manifest_path(archive_base),
+                used_archive=True,
+                refreshed_archive=True,
+            )
+        used_archive = is_archive_source(resolved.profile_root, archive_base)
+        return PreparedTeamsSource(
+            active_source=resolved,
+            live_source=None if used_archive else resolved,
+            archive_root=archive_base if used_archive else None,
+            archive_manifest_path=archive_manifest_path(archive_base) if used_archive else None,
+            used_archive=used_archive,
+            refreshed_archive=False,
+        )
+
+    try:
+        live_source = resolve_live_teams_source()
+    except SystemExit:
+        live_source = None
+
+    if live_source is not None:
+        if refresh_archive:
+            archived = refresh_source_archive(live_source, archive_base)
+            return PreparedTeamsSource(
+                active_source=archived,
+                live_source=live_source,
+                archive_root=archive_base,
+                archive_manifest_path=archive_manifest_path(archive_base),
+                used_archive=True,
+                refreshed_archive=True,
+            )
+        return PreparedTeamsSource(
+            active_source=live_source,
+            live_source=live_source,
+            archive_root=None,
+            archive_manifest_path=None,
+            used_archive=False,
+            refreshed_archive=False,
+        )
+
+    archived_source = discover_archive_source(archive_base)
+    if archived_source is None:
+        raise SystemExit(
+            "Teams IndexedDB LevelDB path not found in the live default roots, and no repo archive copy is available.\n"
+            f"Expected an archive under: {archive_current_root(archive_base)}"
+        )
+    return PreparedTeamsSource(
+        active_source=archived_source,
+        live_source=None,
+        archive_root=archive_base,
+        archive_manifest_path=archive_manifest_path(archive_base),
+        used_archive=True,
+        refreshed_archive=False,
+    )
+
+
+def resolve_teams_source(root: Path | str | None = None) -> TeamsSourcePaths:
+    if root is not None:
+        return resolve_live_teams_source(root)
+
+    try:
+        return resolve_live_teams_source()
+    except SystemExit as live_error:
+        archived = discover_archive_source()
+        if archived is not None:
+            return archived
+        archive_root = archive_current_root()
+        raise SystemExit(f"{live_error}\nNo repo archive copy was found under:\n- {archive_root}") from None
 
 
 def find_default_paths(root: Path | str | None = None) -> tuple[Path, Path]:
