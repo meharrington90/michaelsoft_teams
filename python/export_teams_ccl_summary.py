@@ -3,15 +3,8 @@
 import argparse
 from pathlib import Path
 
-from dump_teams_indexeddb_ccl import iter_wrapper_databases, load_ccl, resolve_teams_source
+from dump_teams_indexeddb_ccl import SUMMARY_TARGETS, get_target_stores, load_ccl, resolve_teams_source
 from teams_ccl_common import decode_output_context, write_json
-
-
-def safe_get_store(db, store_name: str):
-    try:
-        return db[store_name]
-    except Exception:
-        return None
 
 
 def build_sample(label: str, sample: dict | None) -> dict | None:
@@ -97,31 +90,10 @@ def build_summary(root: Path | str | None = None, show_decode_errors: bool = Tru
         "samples": {},
     }
 
-    targets = {
-        "people": ("Teams:substrate-suggestions-manager", "people"),
-        "conversations": ("Teams:conversation-manager", "conversations"),
-        "replychains": ("Teams:replychain-manager", "replychains"),
-        "call_history": ("Teams:call-history-manager", "call-history"),
-        "threads_internal": ("Teams:messaging-slice-manager", "threads-internal-items"),
-        "drafts_internal": ("Teams:messaging-slice-manager", "drafts-internal-items"),
-        "system_messages": ("Teams:channel-info-pane-manager", "system-messages-store"),
-    }
-
-    dbs = iter_wrapper_databases(wrapper)
+    dbs, available_stores = get_target_stores(wrapper, SUMMARY_TARGETS)
     summary["databases_total"] = len(dbs)
-    available_stores = {}
-    for _, db in dbs:
-        db_name = getattr(db, "name", "") or ""
-        for label, (db_prefix, store_name) in targets.items():
-            if label in available_stores:
-                continue
-            if not db_name.startswith(db_prefix):
-                continue
-            store = safe_get_store(db, store_name)
-            if store is not None:
-                available_stores[label] = store
 
-    for label, (db_prefix, store_name) in targets.items():
+    for label in SUMMARY_TARGETS:
         matched = available_stores.get(label)
         if matched is None:
             summary["key_stores"][label] = {"found": False}

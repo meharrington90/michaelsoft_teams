@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from teams_ccl_common import ensure_dir, safe_name
+from teams_ccl_common import ensure_dir, thread_csv_filename
 
 
 def load_export(path: Path) -> dict:
@@ -14,11 +14,6 @@ def load_export(path: Path) -> dict:
 
 def sort_key(message: dict) -> tuple[bool, str, str]:
     return (message.get("timestamp") is None, message.get("timestamp") or "", message.get("id") or "")
-
-
-def thread_filename(thread: dict) -> str:
-    label = thread.get("label") or thread.get("id") or "thread"
-    return f"{safe_name(thread.get('category') or 'thread')}__{safe_name(label)}__{safe_name(thread['id'])[:12]}.csv"
 
 
 def write_csv(path: Path, fieldnames: list[str], rows: list[dict]) -> None:
@@ -57,7 +52,7 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
         all_writer.writeheader()
 
         for thread in ordered_threads:
-            filename = thread_filename(thread)
+            filename = thread_csv_filename(thread)
             thread_rows_written = 0
             thread_messages = sorted(thread.get("messages", []), key=sort_key)
             if thread_messages:

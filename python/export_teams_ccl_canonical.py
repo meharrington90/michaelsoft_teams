@@ -8,7 +8,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from dump_teams_indexeddb_ccl import iter_wrapper_databases, load_ccl, resolve_teams_source
+from dump_teams_indexeddb_ccl import SUMMARY_TARGETS, get_target_stores, load_ccl, resolve_teams_source
+from export_teams_ccl_summary import build_sample, collect_store_stats
 from teams_ccl_common import (
     GUID_RE,
     classify_thread,
@@ -887,55 +888,84 @@ def build_participant_label(participants: list[str], current_user_name: str | No
     return f'{" / ".join(display[:4])} + {len(display) - 4} more'
 
 
-def get_target_store(wrapper, db_prefix: str, store_name: str):
-    for _, db in iter_wrapper_databases(wrapper):
-        db_name = getattr(db, "name", "") or ""
-        if not db_name.startswith(db_prefix):
-            continue
-        try:
-            return db[store_name]
-        except Exception:
-            continue
-    return None
-
-
-def build_export(root: Path | str | None = None, show_decode_errors: bool = True) -> dict:
+def build_export(root: Path | str | None = None, show_decode_errors: bool = True, collect_store_summary: bool = False) -> dict:
     source_info = resolve_teams_source(root)
     ccl = load_ccl()
     leveldb_path = source_info.leveldb_path
     blob_path = source_info.blob_path
     wrapper = ccl.WrappedIndexDB(str(leveldb_path), str(blob_path) if blob_path.exists() else None)
+    dbs, available_stores = get_target_stores(wrapper, SUMMARY_TARGETS)
 
     profile = parse_profile(source_info.local_storage_dir) if source_info.local_storage_dir else None
     current_user_oid = (profile or {}).get("oid")
     current_user_name = (profile or {}).get("display_name")
 
-    people_store = get_target_store(wrapper, "Teams:substrate-suggestions-manager", "people")
-    conversations_store = get_target_store(wrapper, "Teams:conversation-manager", "conversations")
-    replychains_store = get_target_store(wrapper, "Teams:replychain-manager", "replychains")
-    call_history_store = get_target_store(wrapper, "Teams:call-history-manager", "call-history")
+    people_store = available_stores.get("people")
+    conversations_store = available_stores.get("conversations")
+    replychains_store = available_stores.get("replychains")
+    call_history_store = available_stores.get("call_history")
+    store_summary = (
+        {
+            "backend": "ccl_chromium_reader.wrapper",
+            "platform": source_info.platform_name,
+            "search_root": str(source_info.search_root),
+            "profile_root": str(source_info.profile_root),
+            "leveldb_path": str(leveldb_path),
+            "blob_path": str(blob_path) if blob_path.exists() else None,
+            "local_storage_dir": str(source_info.local_storage_dir) if source_info.local_storage_dir else None,
+            "discovery_method": source_info.discovery_method,
+            "databases_total": len(dbs),
+            "key_stores": {},
+            "samples": {},
+        }
+        if collect_store_summary
+        else None
+    )
+
+    def update_store_summary(label: str, record_count: int, sample: dict | None = None, **extra_counts: int) -> None:
+        if store_summary is None:
+            return
+        store_summary["key_stores"][label] = {
+            "found": True,
+            "record_count": record_count,
+            **{key: value for key, value in extra_counts.items() if value},
+        }
+        sample_payload = build_sample(label, sample)
+        if sample_payload is not None:
+            store_summary["samples"][label] = sample_payload
 
     guid_to_name = {}
     if current_user_oid and current_user_name:
         guid_to_name[current_user_oid.lower()] = current_user_name
 
     if people_store is not None:
+        people_count = 0
+        people_sample = None
         with decode_output_context(show_decode_errors):
             for record in people_store.iterate_records(errors_to_stdout=True):
                 value = record.value or {}
+                people_count += 1
+                if people_sample is None:
+                    people_sample = value
                 guid = clean_text(value.get("ExternalDirectoryObjectId")) or extract_guid(value.get("MRI")) or extract_guid(value.get("Id"))
                 name = clean_text(value.get("DisplayName"))
                 if guid and name:
                     guid_to_name[guid.lower()] = name
+        update_store_summary("people", people_count, people_sample)
 
     threads: dict[str, dict] = {}
     thread_titles: dict[str, str] = {}
     thread_types: dict[str, str] = {}
 
     if conversations_store is not None:
+        conversations_count = 0
+        conversations_sample = None
         with decode_output_context(show_decode_errors):
             for record in conversations_store.iterate_records(errors_to_stdout=True):
                 value = record.value or {}
+                conversations_count += 1
+                if conversations_sample is None:
+                    conversations_sample = value
                 thread_id = normalize_thread_id(value.get("id"))
                 if not thread_id:
                     continue
@@ -994,18 +1024,29 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                     participant_ids, participants = flatten_chat_title_users(chat_title, guid_to_name)
                     thread["participant_ids"] = sorted(set(thread["participant_ids"]) | set(participant_ids))
                     thread["participants"] = sorted(set(thread["participants"]) | set(participants))
+        update_store_summary("conversations", conversations_count, conversations_sample)
 
     best_messages: dict[tuple[str, str], dict] = {}
     calllog_calls: dict[str, dict] = {}
     if replychains_store is not None:
+        replychains_count = 0
+        replychains_sample = None
+        replychains_messages_total = 0
+        replychains_threads_with_messages = 0
         with decode_output_context(show_decode_errors):
             for record in replychains_store.iterate_records(errors_to_stdout=True):
                 value = record.value or {}
+                replychains_count += 1
+                if replychains_sample is None:
+                    replychains_sample = value
+                message_map = value.get("messageMap") or {}
+                if message_map:
+                    replychains_messages_total += len(message_map)
+                    replychains_threads_with_messages += 1
                 thread_id = normalize_thread_id(value.get("conversationId"))
                 if not thread_id:
                     continue
                 thread = threads.setdefault(thread_id, init_thread_record(thread_id))
-                message_map = value.get("messageMap") or {}
 
                 if thread_id == "48:calllogs":
                     for _, raw in message_map.items():
@@ -1182,6 +1223,13 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                         or len(message.get("content_text", "")) > len(existing.get("content_text", ""))
                     ):
                         best_messages[key] = message
+        update_store_summary(
+            "replychains",
+            replychains_count,
+            replychains_sample,
+            messages_total=replychains_messages_total,
+            threads_with_messages=replychains_threads_with_messages,
+        )
 
     for (thread_id, _), message in sorted(best_messages.items(), key=lambda item: (item[0][0], item[1].get("timestamp") or "", item[0][1])):
         thread = threads.setdefault(thread_id, init_thread_record(thread_id))
@@ -1189,9 +1237,14 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
 
     calls = []
     if call_history_store is not None:
+        call_history_count = 0
+        call_history_sample = None
         with decode_output_context(show_decode_errors):
             for record in call_history_store.iterate_records(errors_to_stdout=True):
                 value = record.value or {}
+                call_history_count += 1
+                if call_history_sample is None:
+                    call_history_sample = value
                 originator = value.get("originatorParticipant") or {}
                 target = value.get("targetParticipant") or {}
                 originator_endpoint = safe_text(originator.get("id"))
@@ -1243,6 +1296,20 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                         "source": "ccl:call-history",
                     }
                 )
+        update_store_summary("call_history", call_history_count, call_history_sample)
+
+    if store_summary is not None:
+        for label in SUMMARY_TARGETS:
+            if label in store_summary["key_stores"]:
+                continue
+            matched = available_stores.get(label)
+            if matched is None:
+                store_summary["key_stores"][label] = {"found": False}
+                continue
+            store_entry, sample = collect_store_stats(matched, label, show_decode_errors=show_decode_errors)
+            store_summary["key_stores"][label] = store_entry
+            if sample is not None:
+                store_summary["samples"][label] = sample
 
     structured_by_call_id = {(call["call_id"] or "").lower(): call for call in calls if call.get("call_id")}
     structured_by_shared_correlation_id = {
@@ -1351,7 +1418,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
         "people_total": len(guid_to_name),
     }
 
-    return normalize_json_value({
+    payload = {
         "export_format": "teams-ccl-canonical-v1",
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         "source_root": str(source_info.profile_root),
@@ -1372,7 +1439,10 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
             "A small number of keys reported decode errors during CCL iteration and may be missing from this export.",
             "This canonical export now surfaces inline image/file attachments and message reaction summaries from replychains, but it still does not merge every auxiliary store such as notification surfaces.",
         ],
-    })
+    }
+    if store_summary is not None:
+        payload["_store_summary"] = store_summary
+    return normalize_json_value(payload)
 
 
 def main() -> None:

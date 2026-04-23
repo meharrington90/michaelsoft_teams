@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +11,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dump_teams_indexeddb_ccl import (
+    ARCHIVE_REFRESH_LOCK_NAME,
+    ARCHIVE_REFRESH_LOCK_STALE_SECONDS,
     TARGET_BLOB_DIR,
     TARGET_LEVELDB_DIR,
     archive_manifest_path,
@@ -49,6 +52,23 @@ class SourceArchiveTests(unittest.TestCase):
 
             metadata = json.loads(archive_manifest_path(archive_root).read_text(encoding="utf-8"))
             self.assertEqual(metadata["source_root"], str(source.profile_root))
+
+    def test_refresh_source_archive_replaces_stale_lock_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            profile_root = create_fake_profile(temp_root / "live")
+            archive_root = temp_root / "archive"
+            archive_root.mkdir(parents=True, exist_ok=True)
+            lock_path = archive_root / ARCHIVE_REFRESH_LOCK_NAME
+            lock_path.write_text("stale", encoding="utf-8")
+            stale_mtime = time.time() - (ARCHIVE_REFRESH_LOCK_STALE_SECONDS + 5)
+            os.utime(lock_path, (stale_mtime, stale_mtime))
+            source = build_source_paths(profile_root / "IndexedDB" / TARGET_LEVELDB_DIR, temp_root / "live", "test-live")
+
+            archived = refresh_source_archive(source, archive_root=archive_root)
+
+            self.assertTrue((archived.profile_root / "IndexedDB" / TARGET_LEVELDB_DIR / "000003.log").exists())
+            self.assertFalse(lock_path.exists())
 
     def test_prepare_pipeline_source_falls_back_to_existing_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

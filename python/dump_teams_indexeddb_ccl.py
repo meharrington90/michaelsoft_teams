@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
 import platform
 import shutil
 import sys
+import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 
 TARGET_LEVELDB_DIR = "https_teams.microsoft.com_0.indexeddb.leveldb"
@@ -17,6 +21,19 @@ TARGET_BLOB_DIR = "https_teams.microsoft.com_0.indexeddb.blob"
 PROFILE_PRIORITY = {"WV2Profile_tfw": 0, "Default": 1}
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ARCHIVE_ROOT = REPO_ROOT / "Library" / "TeamsSourceArchive"
+ARCHIVE_REFRESH_LOCK_NAME = ".refresh.lock"
+ARCHIVE_REFRESH_LOCK_POLL_SECONDS = 0.2
+ARCHIVE_REFRESH_LOCK_STALE_SECONDS = 3600.0
+ARCHIVE_REFRESH_LOCK_TIMEOUT_SECONDS = 120.0
+SUMMARY_TARGETS = {
+    "people": ("Teams:substrate-suggestions-manager", "people"),
+    "conversations": ("Teams:conversation-manager", "conversations"),
+    "replychains": ("Teams:replychain-manager", "replychains"),
+    "call_history": ("Teams:call-history-manager", "call-history"),
+    "threads_internal": ("Teams:messaging-slice-manager", "threads-internal-items"),
+    "drafts_internal": ("Teams:messaging-slice-manager", "drafts-internal-items"),
+    "system_messages": ("Teams:channel-info-pane-manager", "system-messages-store"),
+}
 
 
 @dataclass(frozen=True)
@@ -227,56 +244,125 @@ def load_archive_manifest(archive_root: Path | None = None) -> dict | None:
         return None
 
 
+@contextmanager
+def archive_refresh_lock(base: Path, timeout_seconds: float = ARCHIVE_REFRESH_LOCK_TIMEOUT_SECONDS):
+    lock_path = base / ARCHIVE_REFRESH_LOCK_NAME
+    deadline = time.monotonic() + timeout_seconds
+    payload = json.dumps(
+        {
+            "pid": os.getpid(),
+            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        },
+        ensure_ascii=False,
+    )
+
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                age_seconds = time.time() - lock_path.stat().st_mtime
+            except OSError:
+                age_seconds = None
+
+            if age_seconds is not None and age_seconds > ARCHIVE_REFRESH_LOCK_STALE_SECONDS:
+                try:
+                    lock_path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    pass
+
+            if time.monotonic() >= deadline:
+                raise SystemExit(f"Timed out waiting for archive refresh lock: {lock_path}")
+            time.sleep(ARCHIVE_REFRESH_LOCK_POLL_SECONDS)
+            continue
+
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            yield
+            return
+        finally:
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
+
+def safe_get_store(db, store_name: str):
+    try:
+        return db[store_name]
+    except Exception:
+        return None
+
+
+def get_target_stores(wrapper: Any, targets: dict[str, tuple[str, str]] | None = None) -> tuple[list[tuple[Any, Any]], dict[str, Any]]:
+    requested = targets or SUMMARY_TARGETS
+    dbs = iter_wrapper_databases(wrapper)
+    available_stores = {}
+    for _, db in dbs:
+        db_name = getattr(db, "name", "") or ""
+        for label, (db_prefix, store_name) in requested.items():
+            if label in available_stores:
+                continue
+            if not db_name.startswith(db_prefix):
+                continue
+            store = safe_get_store(db, store_name)
+            if store is not None:
+                available_stores[label] = store
+        if len(available_stores) == len(requested):
+            break
+    return dbs, available_stores
+
+
 def refresh_source_archive(source: TeamsSourcePaths, archive_root: Path | None = None) -> TeamsSourcePaths:
     if is_archive_source(source.profile_root, archive_root):
         return source
 
     base = Path(archive_root).expanduser().resolve() if archive_root else default_archive_root()
-    current_root = archive_current_root(base)
-    staging_root = base / ".staging"
-    previous_root = base / ".previous"
     base.mkdir(parents=True, exist_ok=True)
-    if staging_root.exists():
-        shutil.rmtree(staging_root)
-    if previous_root.exists():
-        shutil.rmtree(previous_root)
+    current_root = archive_current_root(base)
+    with archive_refresh_lock(base):
+        staging_root = Path(tempfile.mkdtemp(prefix=".staging-", dir=base))
+        previous_root = base / f".previous-{uuid4().hex}"
+        staging_profile = staging_root / "profile"
+        shutil.copytree(source.profile_root, staging_profile, copy_function=shutil.copy2)
 
-    staging_root.mkdir(parents=True, exist_ok=True)
-    staging_profile = staging_root / "profile"
-    shutil.copytree(source.profile_root, staging_profile, copy_function=shutil.copy2)
+        metadata = {
+            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+            "platform": source.platform_name,
+            "search_root": str(source.search_root),
+            "source_root": str(source.profile_root),
+            "leveldb_path": str(source.leveldb_path),
+            "blob_path": str(source.blob_path) if source.blob_path.exists() else None,
+            "local_storage_dir": str(source.local_storage_dir) if source.local_storage_dir else None,
+            "discovery_method": source.discovery_method,
+            "archive_profile_root": str(archive_profile_root(base)),
+        }
+        (staging_root / "archive_manifest.json").write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
-    metadata = {
-        "created_at": datetime.now(tz=timezone.utc).isoformat(),
-        "platform": source.platform_name,
-        "search_root": str(source.search_root),
-        "source_root": str(source.profile_root),
-        "leveldb_path": str(source.leveldb_path),
-        "blob_path": str(source.blob_path) if source.blob_path.exists() else None,
-        "local_storage_dir": str(source.local_storage_dir) if source.local_storage_dir else None,
-        "discovery_method": source.discovery_method,
-        "archive_profile_root": str(archive_profile_root(base)),
-    }
-    (staging_root / "archive_manifest.json").write_text(
-        json.dumps(metadata, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-    try:
-        if current_root.exists():
-            current_root.rename(previous_root)
-        staging_root.rename(current_root)
-    except Exception:
-        if current_root.exists():
-            shutil.rmtree(current_root)
-        if previous_root.exists():
-            previous_root.rename(current_root)
-        raise
-    else:
-        if previous_root.exists():
-            shutil.rmtree(previous_root)
-    finally:
-        if staging_root.exists():
-            shutil.rmtree(staging_root)
+        try:
+            if current_root.exists():
+                current_root.rename(previous_root)
+            staging_root.rename(current_root)
+        except Exception:
+            if current_root.exists():
+                shutil.rmtree(current_root)
+            if previous_root.exists():
+                previous_root.rename(current_root)
+            raise
+        else:
+            if previous_root.exists():
+                shutil.rmtree(previous_root)
+        finally:
+            if staging_root.exists():
+                shutil.rmtree(staging_root)
 
     archived_leveldb = archive_profile_root(base) / "IndexedDB" / TARGET_LEVELDB_DIR
     return build_source_paths(archived_leveldb, current_root, "repo-archive-refresh")
@@ -370,10 +456,6 @@ def resolve_teams_source(root: Path | str | None = None) -> TeamsSourcePaths:
 def find_default_paths(root: Path | str | None = None) -> tuple[Path, Path]:
     source = resolve_teams_source(root)
     return source.leveldb_path, source.blob_path
-
-
-def find_local_storage_dir(root: Path | str | None = None) -> Path | None:
-    return resolve_teams_source(root).local_storage_dir
 
 
 def load_ccl() -> Any:

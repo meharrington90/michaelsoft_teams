@@ -8,7 +8,6 @@ from build_teams_ccl_browser import build_browser
 from dump_teams_indexeddb_ccl import load_archive_manifest, prepare_pipeline_source
 from export_teams_ccl_canonical import build_export
 from export_teams_ccl_csv import export_calls, export_conversations
-from export_teams_ccl_summary import build_summary
 from teams_ccl_common import ensure_dir, write_json
 
 
@@ -37,13 +36,13 @@ def run_pipeline(root: Path | str | None, output_root: Path, *, refresh_source_a
     else:
         print(f"Source profile: {source_root}")
 
-    print_stage(1, 3, "Scanning IndexedDB stores and building the summary report...")
-    summary = build_summary(discovery_root, show_decode_errors=False)
+    print_stage(1, 3, "Scanning IndexedDB stores and assembling export data...")
+    export_data = build_export(discovery_root, show_decode_errors=False, collect_store_summary=True)
+    summary = export_data.pop("_store_summary")
     summary_path = output_root / "teams_ccl_summary.json"
     write_json(summary_path, summary)
 
-    print_stage(2, 3, "Exporting the canonical JSON dataset and CSV files...")
-    export_data = build_export(discovery_root, show_decode_errors=False)
+    print_stage(2, 3, "Writing the canonical JSON dataset and CSV files...")
     canonical_path = output_root / "teams_ccl_canonical_v1.json"
     write_json(canonical_path, export_data, pretty=False)
     export_conversations(export_data, csv_dir)

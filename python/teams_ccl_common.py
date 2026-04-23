@@ -102,6 +102,11 @@ def safe_name(value: str | None, default: str = "untitled") -> str:
     return cleaned or default
 
 
+def thread_csv_filename(thread: dict) -> str:
+    label = thread.get("label") or thread.get("id") or "thread"
+    return f"{safe_name(thread.get('category') or 'thread')}__{safe_name(label)}__{safe_name(thread['id'])[:12]}.csv"
+
+
 def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 

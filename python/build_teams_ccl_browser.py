@@ -4,13 +4,11 @@ import argparse
 import json
 from pathlib import Path
 
-from teams_ccl_common import safe_name
+from teams_ccl_common import thread_csv_filename
 
 
 def thread_csv_path(thread: dict) -> str:
-    label = thread.get("label") or thread.get("id") or "thread"
-    filename = f"{safe_name(thread.get('category') or 'thread')}__{safe_name(label)}__{safe_name(thread['id'])[:12]}.csv"
-    return f"teams_ccl_csv_v1/conversations/{filename}"
+    return f"teams_ccl_csv_v1/conversations/{thread_csv_filename(thread)}"
 
 
 HTML_TEMPLATE = """<!doctype html>
@@ -6267,7 +6265,7 @@ def build_browser_payload(export_data: dict) -> dict:
 
 def build_browser(export_data: dict, output_path: Path) -> None:
     payload = build_browser_payload(export_data)
-    html = HTML_TEMPLATE.replace("__DATA__", json.dumps(payload, ensure_ascii=False))
+    html = HTML_TEMPLATE.replace("__DATA__", json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     output_path.write_text(html, encoding="utf-8")
 
 
