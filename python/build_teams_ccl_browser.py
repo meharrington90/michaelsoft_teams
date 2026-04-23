@@ -440,9 +440,6 @@ HTML_TEMPLATE = """<!doctype html>
         inset 0 1px 0 rgba(255,255,255,.78),
         0 6px 12px rgba(15,23,42,.04);
       cursor: pointer;
-      content-visibility: auto;
-      contain: layout paint style;
-      contain-intrinsic-size: 108px;
       transition:
         transform .18s var(--ease),
         box-shadow .18s var(--ease),
@@ -1083,9 +1080,6 @@ HTML_TEMPLATE = """<!doctype html>
       gap: 10px;
       align-items: end;
       min-width: 0;
-      content-visibility: auto;
-      contain: layout paint style;
-      contain-intrinsic-size: 144px;
     }
     .msg-row.self {
       grid-template-columns: minmax(0, 1fr) 40px;
@@ -2608,6 +2602,71 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
+    function offsetTopWithinContainer(container, element) {
+      if (!container || !element) return 0;
+      let top = 0;
+      let current = element;
+      while (current && current !== container) {
+        top += current.offsetTop || 0;
+        current = current.offsetParent;
+      }
+      if (current === container) {
+        return top;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      return container.scrollTop + (elementRect.top - containerRect.top);
+    }
+
+    function centerSidebarListRow(container, element, behavior = "smooth") {
+      if (!container || !element) return;
+      element.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          const styles = window.getComputedStyle(container);
+          const paddingTop = Number.parseFloat(styles.paddingTop || "0") || 0;
+          const paddingBottom = Number.parseFloat(styles.paddingBottom || "0") || 0;
+          const visibleHeight = Math.max(0, container.clientHeight - paddingTop - paddingBottom);
+          const elementTop = offsetTopWithinContainer(container, element);
+          const elementHeight = element.offsetHeight || element.getBoundingClientRect().height || 0;
+          const rawTop = elementTop - paddingTop - ((visibleHeight - elementHeight) / 2);
+          const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+          const nextTop = Math.max(0, Math.min(maxTop, rawTop));
+          container.scrollTo({ top: nextTop, behavior });
+        });
+      });
+    }
+
+    function mainScrollTopInset(container) {
+      if (!container) return 0;
+      const stickyHeader = container.querySelector(".overview-panel");
+      if (!stickyHeader) return 0;
+      const containerRect = container.getBoundingClientRect();
+      const headerRect = stickyHeader.getBoundingClientRect();
+      const overlap = Math.min(containerRect.bottom, headerRect.bottom) - Math.max(containerRect.top, headerRect.top);
+      return Math.max(0, overlap);
+    }
+
+    function centerMainTimelineRow(container, element, behavior = "smooth") {
+      if (!container || !element) return;
+      element.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          const styles = window.getComputedStyle(container);
+          const paddingTop = Number.parseFloat(styles.paddingTop || "0") || 0;
+          const paddingBottom = Number.parseFloat(styles.paddingBottom || "0") || 0;
+          const topInset = paddingTop + mainScrollTopInset(container);
+          const visibleHeight = Math.max(0, container.clientHeight - topInset - paddingBottom);
+          const elementTop = offsetTopWithinContainer(container, element);
+          const elementHeight = element.offsetHeight || element.getBoundingClientRect().height || 0;
+          const rawTop = elementTop - topInset - ((visibleHeight - elementHeight) / 2);
+          const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+          const nextTop = Math.max(0, Math.min(maxTop, rawTop));
+          container.scrollTo({ top: nextTop, behavior });
+        });
+      });
+    }
+
     function updateScrollTopButton(button, container) {
       if (!button || !container) return;
       const canScroll = container.scrollHeight > container.clientHeight + 24;
@@ -3008,11 +3067,30 @@ HTML_TEMPLATE = """<!doctype html>
       }
     }
 
+    function openCallView(options = {}) {
+      const nextCallKey = String(options.callKey || "");
+      if (!nextCallKey) return;
+      state.view = "calls";
+      state.callKey = nextCallKey;
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
+      renderView();
+      if (options.revealInSidebar) {
+        revealActiveListRow(callList, { behavior: options.scrollBehavior || "smooth" });
+      }
+      if (options.scrollTop) {
+        scrollMainToTop();
+      }
+    }
+
     function revealActiveListRow(scope, options = {}) {
       if (!scope) return;
       const activeRow = scope.querySelector(".list-row.active");
       if (!activeRow) return;
-      centerElementAfterLayout(sidebarListWrap, activeRow, options.behavior || "smooth");
+      const container = scope.closest(".sidebar-list-wrap") || sidebarListWrap;
+      centerSidebarListRow(container, activeRow, options.behavior || "smooth");
     }
 
     function moveSidebarSelection(direction) {
@@ -4284,7 +4362,7 @@ HTML_TEMPLATE = """<!doctype html>
           targets.push({
             thread,
             focusTimestamp,
-            focusCallKey: hasMessageTarget ? "" : targetKey,
+            focusCallKey: hasEventTarget ? targetKey : "",
             viewFilter: "all",
           });
         }
@@ -5424,9 +5502,11 @@ HTML_TEMPLATE = """<!doctype html>
 
       [...contentPanel.querySelectorAll(".open-call-record")].forEach(element => {
         element.addEventListener("click", () => {
-          state.view = "calls";
-          state.callKey = element.dataset.callKey;
-          renderView();
+          openCallView({
+            callKey: element.dataset.callKey,
+            revealInSidebar: true,
+            scrollTop: true,
+          });
         });
       });
     }
@@ -5595,9 +5675,11 @@ HTML_TEMPLATE = """<!doctype html>
       }
       [...contentPanel.querySelectorAll(".open-call-record")].forEach(element => {
         element.addEventListener("click", () => {
-          state.view = "calls";
-          state.callKey = element.dataset.callKey;
-          renderView();
+          openCallView({
+            callKey: element.dataset.callKey,
+            revealInSidebar: true,
+            scrollTop: true,
+          });
         });
       });
       focusThreadPosition();
@@ -5626,7 +5708,7 @@ HTML_TEMPLATE = """<!doctype html>
       }
       if (target) {
         target.classList.add("focused");
-        centerElementAfterLayout(mainScrollWrap, target.closest(".msg-row") || target, "smooth");
+        centerMainTimelineRow(mainScrollWrap, target.closest(".msg-row") || target, "smooth");
       }
     }
 
@@ -5810,8 +5892,9 @@ HTML_TEMPLATE = """<!doctype html>
     callList.addEventListener("click", event => {
       const row = event.target.closest(".list-row[data-key]");
       if (!row || !callList.contains(row)) return;
-      state.callKey = row.dataset.key;
-      renderView();
+      openCallView({
+        callKey: row.dataset.key,
+      });
     });
 
     messageSearch.addEventListener("input", event => {
