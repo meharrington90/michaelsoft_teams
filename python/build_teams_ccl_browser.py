@@ -1636,7 +1636,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     const PERSON_NAME_BY_GUID = new Map(
       Object.entries(DATA.guid_directory || {})
-        .map(([guid, name]) => [normalizeGuid(guid), stripFcs(name)])
+        .map(([guid, name]) => [normalizeGuid(guid), normalizeTextValue(name)])
         .filter(([guid, name]) => guid && name)
     );
     const PERSON_GUID_BY_NAME = new Map(
@@ -1679,7 +1679,7 @@ HTML_TEMPLATE = """<!doctype html>
         rememberPerson(session.id, session.display_name);
       }
       const participantIds = (call.participant_ids || []).map(normalizeGuid).filter(Boolean);
-      const participantNames = (call.participant_display_names || []).map(value => stripFcs(value)).filter(Boolean);
+      const participantNames = (call.participant_display_names || []).map(value => normalizeTextValue(value)).filter(Boolean);
       if (participantIds.length === participantNames.length) {
         for (let index = 0; index < participantIds.length; index += 1) {
           rememberPerson(participantIds[index], participantNames[index]);
@@ -1724,22 +1724,21 @@ HTML_TEMPLATE = """<!doctype html>
         .replace(/'/g, "&#39;");
     }
 
-    function stripFcs(value) {
+    function normalizeTextValue(value) {
       return String(value ?? "")
-        .replace(/\\s*\\(FCS\\)/g, "")
         .replace(/\\s{2,}/g, " ")
         .trim();
     }
 
     function cleanCallParticipantName(value) {
-      let cleaned = stripFcs(value || "").trim();
+      let cleaned = normalizeTextValue(value || "").trim();
       if (!cleaned) return "";
       cleaned = cleaned.replace(/\\s+Conference Virtual Assistant$/i, "").trim();
       cleaned = cleaned.replace(
         /^(.*?)(?:\\s+\\d+\\s+(?:28:[0-9a-fA-F-]{36}|8:orgid:[0-9a-fA-F-]{36}|4:\\+?[0-9(). -]{7,})(?:\\s+\\+?1?[0-9(). -]{7,})?.*)$/i,
         "$1"
       ).trim();
-      return stripFcs(cleaned);
+      return normalizeTextValue(cleaned);
     }
 
     function normalizePhoneNumber(value) {
@@ -1773,7 +1772,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function isGenericPhoneLabel(value) {
-      return /^(wireless caller|state[_ ]of[_ ]alaska|unknown caller|anonymous|private caller|external caller)$/i.test(stripFcs(value || ""));
+      return /^(wireless caller|state[_ ]of[_ ]alaska|unknown caller|anonymous|private caller|external caller)$/i.test(normalizeTextValue(value || ""));
     }
 
     function callPhoneNumber(call, side) {
@@ -1789,7 +1788,7 @@ HTML_TEMPLATE = """<!doctype html>
         return rawName;
       }
       if (normalizePhoneNumber(rawName)) return formatPhoneNumber(rawName);
-      return rawName || phone || stripFcs(call[`${side}_id`] || call[`${side}_endpoint`] || "");
+      return rawName || phone || normalizeTextValue(call[`${side}_id`] || call[`${side}_endpoint`] || "");
     }
 
     function callPanelSideLabel(call, side) {
@@ -1815,7 +1814,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function normalizeName(value) {
-      return stripFcs(value).toLowerCase();
+      return normalizeTextValue(value).toLowerCase();
     }
 
     function rememberPerson(guid, displayName) {
@@ -1830,7 +1829,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function personNameForGuid(guid) {
-      return stripFcs(PERSON_NAME_BY_GUID.get(normalizeGuid(guid)) || "");
+      return normalizeTextValue(PERSON_NAME_BY_GUID.get(normalizeGuid(guid)) || "");
     }
 
     function participantBaseName(value) {
@@ -1848,12 +1847,12 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function looksLikeGuid(value) {
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stripFcs(value || ""));
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalizeTextValue(value || ""));
     }
 
     const CURRENT_USER_ID = normalizeGuid(DATA.profile && DATA.profile.oid);
     const CURRENT_USER_NAME = normalizeName(DATA.profile && DATA.profile.display_name);
-    const PROFILE_DISPLAY_NAME = stripFcs((DATA.profile && DATA.profile.display_name) || "") || "Recovered profile";
+    const PROFILE_DISPLAY_NAME = normalizeTextValue((DATA.profile && DATA.profile.display_name) || "") || "Recovered profile";
     const MESSAGE_COLOR_SELF = "#355CDE";
     const MESSAGE_COLOR_PALETTE = [
       "#0F766E",
@@ -1897,7 +1896,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function threadDisplayLabel(thread) {
-      const fallback = stripFcs(thread.label || thread.id || "Conversation");
+      const fallback = normalizeTextValue(thread.label || thread.id || "Conversation");
       if (thread.category === "chat_space" && isPlaceholderThreadLabel(fallback)) {
         const others = threadExternalParticipantNames(thread);
         if (others.length === 1) return others[0];
@@ -1910,7 +1909,7 @@ HTML_TEMPLATE = """<!doctype html>
       if (!thread || thread.category !== "chat_space") return;
       if (!Array.isArray(thread.messages) || thread.messages.length === 0) return;
       const ids = dedupe((thread.participant_ids || []).map(normalizeGuid).filter(Boolean));
-      const names = dedupe((thread.participants || []).map(value => stripFcs(value)).filter(Boolean));
+      const names = dedupe((thread.participants || []).map(value => normalizeTextValue(value)).filter(Boolean));
       const hasCurrentId = Boolean(CURRENT_USER_ID && ids.includes(CURRENT_USER_ID));
       const hasCurrentName = Boolean(CURRENT_USER_NAME && names.some(name => normalizeName(name) === CURRENT_USER_NAME));
       if (!hasCurrentId && !hasCurrentName) return;
@@ -1977,7 +1976,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function isPhoneEnrichedLabel(name) {
-      const cleaned = stripFcs(name || "").trim();
+      const cleaned = normalizeTextValue(name || "").trim();
       const bracketMatch = cleaned.match(/^(.*?)\\s*\\[([^\\]]+)\\]\\s*$/);
       return Boolean(bracketMatch && normalizePhoneNumber(bracketMatch[2]));
     }
@@ -2018,7 +2017,7 @@ HTML_TEMPLATE = """<!doctype html>
       const mergedByIdentity = new Map();
 
       function mergeEntry(entry) {
-        const name = stripFcs(entry && entry.name || "");
+        const name = normalizeTextValue(entry && entry.name || "");
         const cleanName = cleanCallParticipantName(name);
         if (!cleanName || isGenericPhoneLabel(cleanName)) return;
         const guid = actualGuid(entry && entry.id) || personGuidForName(cleanName);
@@ -2097,7 +2096,7 @@ HTML_TEMPLATE = """<!doctype html>
         entries.push({
           id: guid,
           name: resolvedName,
-          label: resolvedName || stripFcs(guid || explicitName || ""),
+          label: resolvedName || normalizeTextValue(guid || explicitName || ""),
           hidden: hiddenBecauseRemoved || hiddenBecauseUnresolved,
         });
       }
@@ -2192,7 +2191,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function looksLikePhoneEndpoint(name) {
-      const cleaned = stripFcs(name || "").trim();
+      const cleaned = normalizeTextValue(name || "").trim();
       if (!cleaned) return false;
       if (normalizePhoneNumber(cleaned)) return true;
       if (isGenericPhoneLabel(cleaned)) return true;
@@ -2210,7 +2209,7 @@ HTML_TEMPLATE = """<!doctype html>
           ...(call.participant_display_names || []),
           call.originator_display_name,
           call.target_display_name,
-        ].map(value => stripFcs(value)).filter(Boolean));
+        ].map(value => normalizeTextValue(value)).filter(Boolean));
         const hasPhoneEndpoint = explicitPhoneEndpoint || participants.some(looksLikePhoneEndpoint);
         const inCallLogBucket = String(call.conversation_id || "").toLowerCase() === "48:calllogs";
         if (explicitPhoneEndpoint) {
@@ -2279,7 +2278,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function meetingCallTitle(call) {
-      const subject = stripFcs(call.meeting_subject || "").trim() || "Meeting";
+      const subject = normalizeTextValue(call.meeting_subject || "").trim() || "Meeting";
       const when = fmt(call.start_time || call.meeting_start_time || call.connect_time);
       return when && when !== "[no_time]" ? `${subject} [${when}]` : subject;
     }
@@ -2573,7 +2572,7 @@ HTML_TEMPLATE = """<!doctype html>
       const parts = dedupe([
         displayCallStatus(call),
         callDuration(call),
-        stripFcs(call.meeting_subject || ""),
+        normalizeTextValue(call.meeting_subject || ""),
       ].filter(Boolean));
       return parts.join(" | ");
     }
@@ -3021,7 +3020,7 @@ HTML_TEMPLATE = """<!doctype html>
       if (!query) return 2;
       const candidates = dedupe([
         threadDisplayLabel(thread),
-        ...(thread.participants || []).map(value => stripFcs(value)),
+        ...(thread.participants || []).map(value => normalizeTextValue(value)),
       ].filter(Boolean));
       let best = 2;
       for (const candidate of candidates) {
@@ -3144,7 +3143,7 @@ HTML_TEMPLATE = """<!doctype html>
       const attachmentPreview = messageAttachmentPreview(message);
       if (attachmentPreview) {
         if (message.content_text) {
-          return truncate(`${stripFcs(message.content_text)} [${attachmentPreview}]`);
+          return truncate(`${normalizeTextValue(message.content_text)} [${attachmentPreview}]`);
         }
         return truncate(attachmentPreview);
       }
@@ -3167,7 +3166,7 @@ HTML_TEMPLATE = """<!doctype html>
         const parsed = parseTopicUpdateEvent(message);
         return truncate(`Topic updated: ${parsed.topic || "Unknown topic"}`);
       }
-      return truncate(stripFcs(message.content_text || message.message_type || ""));
+      return truncate(normalizeTextValue(message.content_text || message.message_type || ""));
     }
 
     function latestThreadMessage(thread) {
@@ -3452,7 +3451,7 @@ HTML_TEMPLATE = """<!doctype html>
             </div>
           </div>
           <div class="call-event-grid">
-            <div class="call-event-block wide"><div class="k">Participants</div>${renderExpandableChipGroup(participantEntries, { emptyLabel: stripFcs(callLabel(linkedCall || {})) || "No participants were resolved." })}</div>
+            <div class="call-event-block wide"><div class="k">Participants</div>${renderExpandableChipGroup(participantEntries, { emptyLabel: normalizeTextValue(callLabel(linkedCall || {})) || "No participants were resolved." })}</div>
             <div class="call-event-block"><div class="k">Direction</div><div>${highlightSearchHtml(linkedCall ? displayCallDirectionLabel(linkedCall) : "")}</div></div>
             <div class="call-event-block"><div class="k">State</div><div>${highlightSearchHtml(linkedCall ? displayCallStateLabel(linkedCall) : eventName)}</div></div>
             <div class="call-event-block"><div class="k">Start Time</div><div>${escapeHtml(fmt(linkedCall ? linkedCall.start_time : message.timestamp))}</div></div>
@@ -3517,7 +3516,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function resolveGuidLabel(guid) {
       const cleaned = personNameForGuid(guid);
-      return cleaned || stripFcs(guid || "Unknown");
+      return cleaned || normalizeTextValue(guid || "Unknown");
     }
 
     function systemEventActorLabel() {
@@ -3538,7 +3537,7 @@ HTML_TEMPLATE = """<!doctype html>
       const memberNames = [];
       for (const entry of Array.isArray(entries) ? entries : []) {
         const memberId = normalizeGuid((entry && (entry.id || entry.mri || entry.userId)) || "");
-        const friendlyName = stripFcs((entry && (entry.friendlyname || entry.displayName || entry.name)) || "");
+        const friendlyName = normalizeTextValue((entry && (entry.friendlyname || entry.displayName || entry.name)) || "");
         const resolvedName = friendlyName || (memberId ? personNameForGuid(memberId) : "");
         if (memberId && !memberIds.includes(memberId)) memberIds.push(memberId);
         if (resolvedName && !memberNames.includes(resolvedName)) memberNames.push(resolvedName);
@@ -3603,7 +3602,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function previewLabelForEntries(prefix, entries, noun = "members") {
       const meta = hiddenEntryMeta(entries, noun);
-      const visibleLabels = meta.visibleEntries.map(entry => stripFcs(entry.label || entry.name || ""));
+      const visibleLabels = meta.visibleEntries.map(entry => normalizeTextValue(entry.label || entry.name || ""));
       if (visibleLabels.length === 1 && meta.count === 0) return `${prefix}: ${visibleLabels[0]}`;
       if (visibleLabels.length > 1 && meta.count === 0) return `${prefix}: ${visibleLabels.length} ${noun}`;
       if (!visibleLabels.length && meta.count === 1) return `${prefix}: Hidden`;
@@ -3616,7 +3615,7 @@ HTML_TEMPLATE = """<!doctype html>
       const participants = collectEventParticipants(message);
       return linkedCall
         ? callParticipantEntries(linkedCall)
-        : buildParticipantEntries(extractGuids(raw), participants.map(name => stripFcs(name)));
+        : buildParticipantEntries(extractGuids(raw), participants.map(name => normalizeTextValue(name)));
     }
 
     function messageHiddenMeta(message) {
@@ -3698,8 +3697,8 @@ HTML_TEMPLATE = """<!doctype html>
 
     function sortParticipantEntries(entries) {
       return entries.slice().sort((left, right) => {
-        const leftLabel = stripFcs(left.label || left.name || left.id || "").toLowerCase();
-        const rightLabel = stripFcs(right.label || right.name || right.id || "").toLowerCase();
+        const leftLabel = normalizeTextValue(left.label || left.name || left.id || "").toLowerCase();
+        const rightLabel = normalizeTextValue(right.label || right.name || right.id || "").toLowerCase();
         return leftLabel.localeCompare(rightLabel);
       });
     }
@@ -3726,7 +3725,7 @@ HTML_TEMPLATE = """<!doctype html>
         const resolvedName = cleanCallParticipantName(entry.name || (guid ? personNameForGuid(guid) : ""));
         const explicitHidden = Boolean(entry.hidden);
         const visibleLabel = !explicitHidden && resolvedName && !looksLikeGuid(resolvedName) ? resolvedName : "";
-        const hiddenLabel = stripFcs(entry.label || resolvedName || guid || entry.name || "");
+        const hiddenLabel = normalizeTextValue(entry.label || resolvedName || guid || entry.name || "");
         const entryIdKey = guid || "";
         const visibleKey = normalizeName(visibleLabel);
         const hiddenKey = normalizeName(hiddenLabel);
@@ -3788,7 +3787,7 @@ HTML_TEMPLATE = """<!doctype html>
           <div class="chips expandable-list collapsed" data-expandable-list>
             ${visibleEntries.map(entry => {
               const chatThread = options.enableChatLinks === false ? null : directChatThreadForPerson(entry);
-              const label = stripFcs(entry.label || entry.name || "");
+              const label = normalizeTextValue(entry.label || entry.name || "");
               if (chatThread) {
                 return `<button type="button" class="chip participant-chip participant-chip-link open-participant-chat" data-thread-id="${escapeHtml(chatThread.id)}" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
               }
@@ -3863,7 +3862,7 @@ HTML_TEMPLATE = """<!doctype html>
 
       const senderId = String(message.sender_id || "").toLowerCase();
       const actorId = senderId || unique[0] || "";
-      const actorName = stripFcs(message.sender_display_name || personNameForGuid(actorId) || "");
+      const actorName = normalizeTextValue(message.sender_display_name || personNameForGuid(actorId) || "");
       const addedIds = unique.filter(guid => guid !== actorId);
       const addedNames = addedIds.map(personNameForGuid);
 
@@ -3878,7 +3877,7 @@ HTML_TEMPLATE = """<!doctype html>
     function parseMemberJoinedEvent(message) {
       const payload = parseJsonObject(message.content_text || "");
       const actorId = normalizeGuid(payload && payload.initiator);
-      const actorName = stripFcs(
+      const actorName = normalizeTextValue(
         message.sender_display_name ||
         personNameForGuid(actorId) ||
         ""
@@ -3894,7 +3893,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function parseDeleteMemberEvent(message) {
       const actorId = normalizeGuid(message.sender_id || extractGuids(message.content_text || "")[0] || "");
-      const actorName = stripFcs(
+      const actorName = normalizeTextValue(
         message.sender_display_name ||
         personNameForGuid(actorId) ||
         ""
@@ -3926,16 +3925,16 @@ HTML_TEMPLATE = """<!doctype html>
         message.sender_id ||
         ""
       );
-      const actorName = stripFcs(
+      const actorName = normalizeTextValue(
         message.sender_display_name ||
         personNameForGuid(actorId) ||
         ""
       );
-      let topic = stripFcs(threadActivityXmlValue(message, "value") || "");
+      let topic = normalizeTextValue(threadActivityXmlValue(message, "value") || "");
       if (!topic) {
-        const rawText = stripFcs(message.content_text || "");
+        const rawText = normalizeTextValue(message.content_text || "");
         const match = rawText.match(/^\\d+\\s+(?:8:orgid:)?[0-9a-f-]{36}\\s+(.+)$/i);
-        topic = stripFcs(match ? match[1] : rawText);
+        topic = normalizeTextValue(match ? match[1] : rawText);
       }
       return {
         actorId,
@@ -4049,7 +4048,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function renderTopicUpdateEventBody(message, thread) {
       const parsed = parseTopicUpdateEvent(message);
-      const updatedTopic = stripFcs(parsed.topic || threadDisplayLabel(thread) || thread.id || "");
+      const updatedTopic = normalizeTextValue(parsed.topic || threadDisplayLabel(thread) || thread.id || "");
       const cardHtml = `
         <div class="call-event" style="--call-bg:#e9edf9;--call-outline:#5a6d9d;--call-block-bg:#f6f8ff;--call-title:#334778;">
           <div class="call-event-header">
@@ -4171,7 +4170,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function attachmentExtension(value) {
-      const text = stripFcs(value || "").trim().toLowerCase();
+      const text = normalizeTextValue(value || "").trim().toLowerCase();
       if (!text) return "";
       const target = text.includes(".") ? text : attachmentNameFromUrl(text).toLowerCase();
       const match = target.match(/\\.([a-z0-9]{2,6})(?:$|[?#])/i);
@@ -4252,7 +4251,7 @@ HTML_TEMPLATE = """<!doctype html>
       if (!value || typeof value !== "object") return null;
       const url = String(value.url || "").trim();
       const previewUrl = String(value.preview_url || value.previewUrl || "").trim();
-      const name = stripFcs(value.name || "") || attachmentNameFromUrl(url || previewUrl) || attachmentKindLabel(value.kind || "file");
+      const name = normalizeTextValue(value.name || "") || attachmentNameFromUrl(url || previewUrl) || attachmentKindLabel(value.kind || "file");
       const kind = normalizeAttachmentKind(value.kind, name, url || previewUrl);
       if (!url && !previewUrl) return null;
       return {
@@ -4299,7 +4298,7 @@ HTML_TEMPLATE = """<!doctype html>
         if (!(itemtype.includes("hyperlink/files") || itemtype.includes("fileshyperlink"))) continue;
         const href = String(node.getAttribute("href") || "").trim();
         addAttachment({
-          name: stripFcs(node.textContent || "") || node.getAttribute("title") || "",
+          name: normalizeTextValue(node.textContent || "") || node.getAttribute("title") || "",
           url: href,
           kind: itemtype,
         });
@@ -4395,7 +4394,7 @@ HTML_TEMPLATE = """<!doctype html>
       if (message.message_type === "ThreadActivity/TopicUpdate") {
         return systemEventActorLabel();
       }
-      return stripFcs(message.sender_display_name || message.sender_id || "Unknown");
+      return normalizeTextValue(message.sender_display_name || message.sender_id || "Unknown");
     }
 
     function messagePassesFilter(message) {
@@ -4897,7 +4896,7 @@ HTML_TEMPLATE = """<!doctype html>
             <span class="list-pill">${escapeHtml(displayCallGroupLabel(call))}</span>
             <span class="list-time">${escapeHtml(fmt(callPrimaryTimestamp(call)))}</span>
           </div>
-          <strong class="list-title">${escapeHtml(stripFcs(callLabel(call)))}</strong>
+          <strong class="list-title">${escapeHtml(normalizeTextValue(callLabel(call)))}</strong>
           <div class="list-stats">
             <span>${escapeHtml(displayCallStatus(call) || "Unclassified")}</span>
             <span>${escapeHtml(callDuration(call) || "Duration unavailable")}</span>
@@ -4999,7 +4998,7 @@ HTML_TEMPLATE = """<!doctype html>
       const eventCount = messages.filter(message => message.quality === "event").length;
       const curatedCount = messages.filter(message => message.quality !== "event").length;
       const meeting = thread.meeting || {};
-      const meetingSubject = stripFcs(meeting.subject || meetingCall.meeting_subject || meta.topic || threadDisplayLabel(thread) || "");
+      const meetingSubject = normalizeTextValue(meeting.subject || meetingCall.meeting_subject || meta.topic || threadDisplayLabel(thread) || "");
       const meetingStart = meeting.startTime || meetingCall.meeting_start_time || "";
       const meetingEnd = meeting.endTime || meetingCall.meeting_end_time || "";
       const meetingWindowLabel = meetingStart ? `${fmt(meetingStart)} to ${fmt(meetingEnd)}` : "";
@@ -5204,7 +5203,7 @@ HTML_TEMPLATE = """<!doctype html>
         <section class="detail-hero">
           <div class="kicker">${escapeHtml(callGroupLabel)}</div>
           <div class="title">
-            <h2>${escapeHtml(stripFcs(callLabel(call)))}</h2>
+            <h2>${escapeHtml(normalizeTextValue(callLabel(call)))}</h2>
             <div class="chip chip-strong">${escapeHtml(displayCallStatus(call))}</div>
           </div>
           <div class="chips">
@@ -5236,8 +5235,8 @@ HTML_TEMPLATE = """<!doctype html>
           ${(callSideLabel(call, "target")) ? `<div class="meta-block"><div class="k">Target</div><div>${escapeHtml(callSideLabel(call, "target"))}</div></div>` : ``}
           <div class="meta-block"><div class="k">Call Id</div><div class="mono">${escapeHtml(call.call_id || "")}</div></div>
           ${call.shared_correlation_id ? `<div class="meta-block"><div class="k">Shared Correlation Id</div><div class="mono">${escapeHtml(call.shared_correlation_id || "")}</div></div>` : ``}
-          <div class="meta-block wide"><div class="k">Participants</div>${renderExpandableChipGroup(callParticipantEntriesList, { emptyLabel: stripFcs(callLabel(call)) || "No participants were resolved." })}</div>
-          ${call.meeting_subject ? `<div class="meta-block"><div class="k">Meeting Subject</div><div>${escapeHtml(stripFcs(call.meeting_subject || ""))}</div></div>` : ``}
+          <div class="meta-block wide"><div class="k">Participants</div>${renderExpandableChipGroup(callParticipantEntriesList, { emptyLabel: normalizeTextValue(callLabel(call)) || "No participants were resolved." })}</div>
+          ${call.meeting_subject ? `<div class="meta-block"><div class="k">Meeting Subject</div><div>${escapeHtml(normalizeTextValue(call.meeting_subject || ""))}</div></div>` : ``}
           ${callMeetingWindow ? `<div class="meta-block"><div class="k">Meeting Window</div><div>${escapeHtml(callMeetingWindow)}</div></div>` : ``}
         </div>
         <div class="section-divider">

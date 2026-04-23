@@ -94,6 +94,21 @@ class BuildBrowserPayloadTests(unittest.TestCase):
         self.assertIn("focusMessageId", html)
         self.assertIn("centerElementInContainer", html)
 
+    def test_generated_html_preserves_display_name_suffixes(self) -> None:
+        export_data = self.build_export_data()
+        export_data["profile"]["display_name"] = "Example User (FCS)"
+        export_data["threads"][0]["messages"][0]["sender_display_name"] = "Alice (FCS)"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "browser.html"
+            build_browser(export_data, output_path)
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Alice (FCS)", html)
+        self.assertIn("Example User (FCS)", html)
+        self.assertIn("function normalizeTextValue", html)
+        self.assertNotIn('.replace(/\\\\s*\\\\(FCS\\\\)/g, "")', html)
+
 
 if __name__ == "__main__":
     unittest.main()
