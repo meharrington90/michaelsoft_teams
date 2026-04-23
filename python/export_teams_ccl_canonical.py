@@ -123,6 +123,19 @@ def parse_json_list(value) -> list[dict]:
     return []
 
 
+def parse_json_object(value) -> dict | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def file_name_from_url(value: str | None) -> str | None:
     cleaned = clean_text(value)
     if not cleaned:
@@ -265,6 +278,72 @@ def extract_message_attachments(raw: dict, content_html: str | None) -> list[dic
     for attachment in extract_html_attachments(content_html):
         append_attachment(attachments, attachment)
     return attachments
+
+
+def extract_message_reactions(raw: dict, guid_to_name: dict[str, str]) -> list[dict]:
+    reaction_map: dict[str, dict] = {}
+    properties = raw.get("properties") or {}
+    emotion_items = parse_json_list(properties.get("emotions")) if isinstance(properties, dict) else []
+
+    for item in emotion_items:
+        key = (safe_text(item.get("key") or item.get("emotion") or item.get("name")) or "").lower()
+        if not key:
+            continue
+        entry = reaction_map.setdefault(key, {"key": key, "count": 0, "users": []})
+        seen_users = {
+            (existing.get("id") or "", existing.get("display_name") or "", existing.get("reacted_at") or "")
+            for existing in entry["users"]
+            if isinstance(existing, dict)
+        }
+        for user in parse_json_list(item.get("users")):
+            raw_id = safe_text(user.get("mri") or user.get("id") or user.get("userId"))
+            user_id = extract_guid(raw_id)
+            display_name = safe_text(user.get("displayName")) or (guid_to_name.get(user_id) if user_id else None)
+            if user_id and display_name:
+                guid_to_name.setdefault(user_id, display_name)
+            reacted_at = to_iso_from_millis(user.get("time") or user.get("timestamp") or user.get("reactedAt"))
+            identity = (user_id or "", display_name or "", reacted_at or "")
+            if identity in seen_users:
+                continue
+            seen_users.add(identity)
+            cleaned_user = {
+                field: value
+                for field, value in {
+                    "id": user_id,
+                    "display_name": display_name,
+                    "reacted_at": reacted_at,
+                }.items()
+                if value is not None and value != ""
+            }
+            if cleaned_user:
+                entry["users"].append(cleaned_user)
+        entry["count"] = max(entry["count"], len(entry["users"]))
+
+    annotations_summary = parse_json_object(raw.get("annotationsSummary")) or {}
+    annotation_emotions = annotations_summary.get("emotions") or {}
+    if isinstance(annotation_emotions, dict):
+        for raw_key, raw_count in annotation_emotions.items():
+            key = (safe_text(raw_key) or "").lower()
+            if not key:
+                continue
+            entry = reaction_map.setdefault(key, {"key": key, "count": 0, "users": []})
+            try:
+                count = int(raw_count)
+            except (TypeError, ValueError):
+                count = 0
+            entry["count"] = max(entry["count"], count, len(entry["users"]))
+
+    normalized = []
+    for reaction in reaction_map.values():
+        count = max(reaction.get("count") or 0, len(reaction.get("users") or []))
+        normalized.append(
+            {
+                "key": reaction["key"],
+                "count": count,
+                "users": reaction.get("users") or [],
+            }
+        )
+    return sorted(normalized, key=lambda item: (-int(item.get("count") or 0), item.get("key") or ""))
 
 
 def flatten_members(members: list[dict], guid_to_name: dict[str, str]) -> tuple[list[str], list[str]]:
@@ -1065,6 +1144,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                         content_html = None
                         content_text = safe_text(content_string if content_string is not None else content)
                     attachments = extract_message_attachments(raw, content_html)
+                    reactions = extract_message_reactions(raw, guid_to_name)
                     quality = classify_quality(message_type, content_text)
                     if attachments and quality == "residual":
                         quality = "attachment"
@@ -1091,6 +1171,8 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                         "quality": quality,
                         "source": "ccl:replychains",
                     }
+                    if reactions:
+                        message["reactions"] = reactions
                     message = {key: value for key, value in message.items() if value is not None and value != ""}
 
                     key = (thread_id, message_id)
@@ -1288,7 +1370,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
         "limitations": [
             "Built from structured IndexedDB object stores using ccl_chromium_reader and the matching blob directory.",
             "A small number of keys reported decode errors during CCL iteration and may be missing from this export.",
-            "This canonical export now surfaces inline image/file attachments from replychains, but it still does not merge every auxiliary store such as full reaction history or notification surfaces.",
+            "This canonical export now surfaces inline image/file attachments and message reaction summaries from replychains, but it still does not merge every auxiliary store such as notification surfaces.",
         ],
     })
 

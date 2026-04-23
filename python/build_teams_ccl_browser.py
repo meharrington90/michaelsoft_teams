@@ -1254,6 +1254,134 @@ HTML_TEMPLATE = """<!doctype html>
       word-break: break-word;
       font-size: 13px;
     }
+    .msg .body.reply-body {
+      display: grid;
+      gap: 10px;
+      white-space: normal;
+    }
+    .reply-quote {
+      display: grid;
+      gap: 5px;
+      padding: 10px 12px;
+      border-left: 3px solid rgba(37,99,235,.34);
+      border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(236,243,255,.96), rgba(247,250,255,.92));
+      color: var(--muted-strong);
+    }
+    .reply-quote-author {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-strong);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .reply-quote-text {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      word-break: break-word;
+      font-size: 12px;
+    }
+    .reply-response {
+      white-space: pre-wrap;
+      line-height: 1.5;
+      word-break: break-word;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .reaction-bar {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+    .reaction-bubble {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(88,110,147,.18);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(236,243,255,.92));
+      box-shadow:
+        0 6px 12px rgba(15,23,42,.08),
+        0 0 0 1px rgba(255,255,255,.48) inset;
+      color: var(--muted-strong);
+      font-size: 12px;
+      line-height: 1;
+      cursor: default;
+    }
+    .reaction-count {
+      font-weight: 800;
+      color: var(--accent-strong);
+    }
+    .reaction-icons {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 15px;
+    }
+    .reaction-icon-more {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .reaction-tooltip {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 10px);
+      min-width: 220px;
+      max-width: min(320px, 72vw);
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(88,110,147,.20);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.99), rgba(241,246,255,.96));
+      box-shadow:
+        0 14px 26px rgba(15,23,42,.16),
+        0 0 0 1px rgba(255,255,255,.58) inset;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition:
+        opacity .16s var(--ease),
+        transform .16s var(--ease);
+      z-index: 40;
+    }
+    .reaction-bubble:hover .reaction-tooltip,
+    .reaction-bubble:focus-within .reaction-tooltip {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reaction-tooltip-group {
+      display: grid;
+      gap: 5px;
+    }
+    .reaction-tooltip-heading {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--accent-strong);
+    }
+    .reaction-tooltip-user {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: start;
+      font-size: 12px;
+      color: var(--ink);
+    }
+    .reaction-tooltip-emoji {
+      font-size: 14px;
+      line-height: 1;
+    }
+    .reaction-tooltip-empty {
+      font-size: 12px;
+      color: var(--muted);
+    }
     details.msg-collapsible {
       padding: 0;
       overflow: hidden;
@@ -1631,6 +1759,8 @@ HTML_TEMPLATE = """<!doctype html>
     const mainScrollTopButton = document.getElementById("mainScrollTop");
     const toast = document.getElementById("toast");
     const MESSAGE_ATTACHMENT_CACHE = new WeakMap();
+    const MESSAGE_REPLY_QUOTE_CACHE = new WeakMap();
+    const MESSAGE_REACTION_CACHE = new WeakMap();
     const NUMBER_FORMATTER = new Intl.NumberFormat();
     const UI_STATE_STORAGE_KEY = "michaelsoft_teams_ui_state_v2";
 
@@ -3141,6 +3271,25 @@ HTML_TEMPLATE = """<!doctype html>
     function threadPreviewForMessage(message) {
       if (!message) return "No recoverable message preview";
       const attachmentPreview = messageAttachmentPreview(message);
+      const replyQuote = messageReplyQuote(message);
+      if (replyQuote) {
+        const replyParts = [];
+        if (replyQuote.author && replyQuote.preview) {
+          replyParts.push(`${replyQuote.author}: ${replyQuote.preview}`);
+        } else if (replyQuote.preview) {
+          replyParts.push(replyQuote.preview);
+        }
+        if (replyQuote.reply_text) {
+          replyParts.push(replyQuote.reply_text);
+        }
+        if (replyParts.length) {
+          const previewText = truncate(replyParts.join(" | "));
+          if (attachmentPreview) {
+            return truncate(`${previewText} [${attachmentPreview}]`);
+          }
+          return previewText;
+        }
+      }
       if (attachmentPreview) {
         if (message.content_text) {
           return truncate(`${normalizeTextValue(message.content_text)} [${attachmentPreview}]`);
@@ -4376,6 +4525,284 @@ HTML_TEMPLATE = """<!doctype html>
       `;
     }
 
+    function extractHtmlText(node) {
+      if (!node) return "";
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || "";
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return "";
+      }
+
+      const tagName = String(node.tagName || "").toLowerCase();
+      if (tagName === "br") {
+        return "\\n";
+      }
+
+      let text = "";
+      for (const child of node.childNodes || []) {
+        text += extractHtmlText(child);
+      }
+
+      if (["p", "div", "li", "blockquote"].includes(tagName)) {
+        text += "\\n";
+      }
+      return text;
+    }
+
+    function normalizeStructuredText(value) {
+      return String(value ?? "")
+        .replace(/\\u00a0/g, " ")
+        .replace(/[ \\t]+\\n/g, "\\n")
+        .replace(/\\n[ \\t]+/g, "\\n")
+        .replace(/\\n{3,}/g, "\\n\\n")
+        .replace(/[ \\t]{2,}/g, " ")
+        .trim();
+    }
+
+    function messageReplyQuote(message) {
+      if (!message || typeof message !== "object") return null;
+      if (MESSAGE_REPLY_QUOTE_CACHE.has(message)) return MESSAGE_REPLY_QUOTE_CACHE.get(message);
+
+      const rawHtml = String(message.content_html || "").trim();
+      if (!rawHtml || !rawHtml.toLowerCase().includes("schema.skype.com/reply")) {
+        MESSAGE_REPLY_QUOTE_CACHE.set(message, null);
+        return null;
+      }
+
+      let parsed = null;
+      try {
+        const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+        const blockquote = [...doc.querySelectorAll("blockquote[itemtype]")]
+          .find(node => String(node.getAttribute("itemtype") || "").toLowerCase().includes("schema.skype.com/reply"));
+        if (!blockquote) {
+          MESSAGE_REPLY_QUOTE_CACHE.set(message, null);
+          return null;
+        }
+
+        const author = normalizeTextValue(
+          (blockquote.querySelector("[itemprop='mri']") || {}).textContent || ""
+        );
+        const preview = normalizeStructuredText(
+          (blockquote.querySelector("[itemprop='preview']") || {}).textContent || ""
+        );
+        const quotedMessageId = normalizeTextValue(blockquote.getAttribute("itemid") || "");
+        blockquote.remove();
+        const replyText = normalizeStructuredText(extractHtmlText(doc.body));
+
+        parsed = {
+          author,
+          preview,
+          quoted_message_id: quotedMessageId,
+          reply_text: replyText,
+        };
+        if (!parsed.author && !parsed.preview && !parsed.reply_text) {
+          parsed = null;
+        }
+      } catch {
+        parsed = null;
+      }
+
+      MESSAGE_REPLY_QUOTE_CACHE.set(message, parsed);
+      return parsed;
+    }
+
+    const REACTION_EMOJI_MAP = Object.freeze({
+      like: "👍",
+      heart: "❤️",
+      laugh: "😂",
+      rofl: "🤣",
+      surprised: "😮",
+      cry: "😢",
+      angry: "😡",
+      fire: "🔥",
+      hug: "🤗",
+      think: "🤔",
+      cool: "😎",
+      worry: "😟",
+      party: "🥳",
+      muscle: "💪",
+      upsidedownface: "🙃",
+      smilerobot: "🤖",
+      crossedfingers: "🤞",
+      pointupindex: "☝️",
+      pinchedfingers: "🤌",
+      fistbump: "👊",
+      unamused: "😒",
+      likewithfacemser: "👍",
+      handsinair: "🙌",
+      giggle: "🤭",
+      hearteyes: "😍",
+      plunger: "🪠",
+      no: "👎",
+      manfacepalming: "🤦‍♂️",
+      starmser: "⭐",
+      blankface: "😑",
+      fingerheart: "🫰",
+      bunnyhug: "🤗",
+      rock: "🤘",
+      shivering: "🥶",
+      "yes-tone1": "👍🏻",
+      "yes-tone2": "👍🏼",
+      yes: "👍",
+      poke: "👉",
+      snegovik: "⛄",
+      emo: "🙂",
+    });
+
+    const REACTION_LABEL_MAP = Object.freeze({
+      like: "Like",
+      heart: "Heart",
+      laugh: "Laugh",
+      rofl: "ROFL",
+      surprised: "Surprised",
+      cry: "Cry",
+      angry: "Angry",
+      fire: "Fire",
+      hug: "Hug",
+      think: "Think",
+      cool: "Cool",
+      worry: "Worry",
+      party: "Party",
+      muscle: "Muscle",
+      upsidedownface: "Upside Down Face",
+      smilerobot: "Smile Robot",
+      crossedfingers: "Crossed Fingers",
+      pointupindex: "Point Up",
+      pinchedfingers: "Pinched Fingers",
+      fistbump: "Fist Bump",
+      unamused: "Unamused",
+      likewithfacemser: "Like",
+      handsinair: "Hands In Air",
+      giggle: "Giggle",
+      hearteyes: "Heart Eyes",
+      plunger: "Plunger",
+      no: "No",
+      manfacepalming: "Facepalm",
+      starmser: "Star",
+      blankface: "Blank Face",
+      fingerheart: "Finger Heart",
+      bunnyhug: "Bunny Hug",
+      rock: "Rock",
+      shivering: "Shivering",
+      "yes-tone1": "Thumbs Up",
+      "yes-tone2": "Thumbs Up",
+      yes: "Thumbs Up",
+      poke: "Poke",
+      snegovik: "Snowman",
+      emo: "Emoji",
+    });
+
+    function reactionEmoji(key) {
+      const normalizedKey = normalizeTextValue(key || "").toLowerCase();
+      if (!normalizedKey) return "❔";
+      if (REACTION_EMOJI_MAP[normalizedKey]) return REACTION_EMOJI_MAP[normalizedKey];
+      const match = normalizedKey.match(/^([0-9a-f]{4,6}(?:-[0-9a-f]{4,6})*)(?:_|$)/i);
+      if (match) {
+        try {
+          return match[1]
+            .split("-")
+            .map(value => String.fromCodePoint(Number.parseInt(value, 16)))
+            .join("");
+        } catch {
+          return "❔";
+        }
+      }
+      return "❔";
+    }
+
+    function reactionLabel(key) {
+      const normalizedKey = normalizeTextValue(key || "").toLowerCase();
+      if (!normalizedKey) return "Reaction";
+      if (REACTION_LABEL_MAP[normalizedKey]) return REACTION_LABEL_MAP[normalizedKey];
+      const withoutCodepoint = normalizedKey.replace(/^[0-9a-f]{4,6}(?:-[0-9a-f]{4,6})*_/i, "");
+      const normalizedLabel = (withoutCodepoint || normalizedKey)
+        .replace(/-tone\\d+/g, "")
+        .replace(/mser$/i, "")
+        .replace(/_/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .trim();
+      return normalizedLabel
+        ? normalizedLabel.replace(/\\b\\w/g, letter => letter.toUpperCase())
+        : "Reaction";
+    }
+
+    function messageReactions(message) {
+      if (!message || typeof message !== "object") return [];
+      if (MESSAGE_REACTION_CACHE.has(message)) return MESSAGE_REACTION_CACHE.get(message);
+
+      const normalized = [];
+      for (const reaction of message.reactions || []) {
+        if (!reaction || typeof reaction !== "object") continue;
+        const key = normalizeTextValue(reaction.key || "").toLowerCase();
+        if (!key) continue;
+        const users = [];
+        const seenUsers = new Set();
+        for (const user of reaction.users || []) {
+          const id = normalizeGuid(user && user.id || "");
+          const displayName = normalizeTextValue(user && (user.display_name || (id ? personNameForGuid(id) : "")) || "");
+          const reactedAt = normalizeTextValue(user && user.reacted_at || "");
+          const identity = id || normalizeName(displayName) || reactedAt || `${key}:${users.length}`;
+          if (seenUsers.has(identity)) continue;
+          seenUsers.add(identity);
+          users.push({
+            id,
+            display_name: displayName || (id ? personNameForGuid(id) : ""),
+            reacted_at: reactedAt,
+          });
+        }
+        const parsedCount = Number.parseInt(reaction.count, 10);
+        const count = Number.isFinite(parsedCount) ? parsedCount : 0;
+        normalized.push({
+          key,
+          emoji: reactionEmoji(key),
+          label: reactionLabel(key),
+          count: Math.max(count, users.length),
+          users,
+        });
+      }
+
+      normalized.sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+      MESSAGE_REACTION_CACHE.set(message, normalized);
+      return normalized;
+    }
+
+    function renderMessageReactions(message, highlightQuery = "") {
+      const reactions = messageReactions(message);
+      if (!reactions.length) return "";
+
+      const totalCount = reactions.reduce((sum, reaction) => sum + Math.max(reaction.count || 0, reaction.users.length || 0), 0);
+      const emojiHtml = reactions.slice(0, 5)
+        .map(reaction => `<span>${escapeHtml(reaction.emoji)}</span>`)
+        .join("");
+      const moreCount = reactions.length > 5 ? reactions.length - 5 : 0;
+      const tooltipHtml = reactions.map(reaction => {
+        const heading = `${reaction.emoji} ${reaction.label} ${reaction.count > 1 ? `· ${reaction.count}` : ""}`.trim();
+        const headingHtml = highlightQuery
+          ? highlightSearchHtml(heading, highlightQuery)
+          : escapeHtml(heading);
+        let rows = reaction.users.map(user => {
+          const name = user.display_name || user.id || "Unknown user";
+          const nameHtml = highlightQuery ? highlightSearchHtml(name, highlightQuery) : escapeHtml(name);
+          return `<div class="reaction-tooltip-user"><span class="reaction-tooltip-emoji">${escapeHtml(reaction.emoji)}</span><span>${nameHtml}</span></div>`;
+        }).join("");
+        if (!rows) {
+          rows = `<div class="reaction-tooltip-empty">${escapeHtml(`${reaction.count} reaction${reaction.count == 1 ? "" : "s"}`)}</div>`;
+        }
+        return `<div class="reaction-tooltip-group"><div class="reaction-tooltip-heading">${headingHtml}</div>${rows}</div>`;
+      }).join("");
+
+      return `
+        <div class="reaction-bar">
+          <div class="reaction-bubble" tabindex="0" aria-label="${escapeHtml(`${totalCount} reactions`)}">
+            <span class="reaction-count">${escapeHtml(String(totalCount))}</span>
+            <span class="reaction-icons">${emojiHtml}${moreCount ? `<span class="reaction-icon-more">+${escapeHtml(String(moreCount))}</span>` : ``}</span>
+            <div class="reaction-tooltip">${tooltipHtml}</div>
+          </div>
+        </div>
+      `;
+    }
+
     function displayMessageQuality(message) {
       if (messageHasAttachments(message) && message.quality !== "event") return "attachment";
       return message.quality || "";
@@ -4604,6 +5031,7 @@ HTML_TEMPLATE = """<!doctype html>
         return MESSAGE_SEARCH_TEXT_CACHE.get(message);
       }
       const attachments = messageAttachments(message);
+      const reactions = messageReactions(message);
       const parts = [
         thread.label,
         threadDisplayLabel(thread),
@@ -4617,6 +5045,9 @@ HTML_TEMPLATE = """<!doctype html>
         displayMessageQuality(message),
         ...attachments.map(attachment => attachment.name),
         ...attachments.map(attachment => attachment.url),
+        ...reactions.map(reaction => reaction.label),
+        ...reactions.map(reaction => reaction.key),
+        ...reactions.flatMap(reaction => reaction.users.map(user => user.display_name || user.id || "")),
       ];
       if (message.message_type === "ThreadActivity/AddMember") {
         const parsed = parseAddMemberEvent(message);
@@ -4651,6 +5082,23 @@ HTML_TEMPLATE = """<!doctype html>
       if (isStructuredThreadActivityEvent(message)) {
         return renderMembershipEventBody(message, thread);
       }
+      const replyQuote = messageReplyQuote(message);
+      if (replyQuote) {
+        const quoteAuthorHtml = replyQuote.author
+          ? `<div class="reply-quote-author">${useHighlight ? highlightSearchHtml(replyQuote.author, highlightQuery) : escapeHtml(replyQuote.author)}</div>`
+          : ``;
+        const quotePreviewHtml = replyQuote.preview
+          ? `<div class="reply-quote-text">${useHighlight ? highlightSearchHtml(replyQuote.preview, highlightQuery) : escapeHtml(replyQuote.preview)}</div>`
+          : ``;
+        const replyTextHtml = replyQuote.reply_text
+          ? `<div class="reply-response">${useHighlight ? highlightSearchHtml(replyQuote.reply_text, highlightQuery) : escapeHtml(replyQuote.reply_text)}</div>`
+          : ``;
+        const attachmentsHtml = messageHasAttachments(message) ? renderAttachmentCards(message) : ``;
+        const quoteHtml = (quoteAuthorHtml || quotePreviewHtml)
+          ? `<div class="reply-quote">${quoteAuthorHtml}${quotePreviewHtml}</div>`
+          : ``;
+        return `<div class="body reply-body">${quoteHtml}${replyTextHtml}${attachmentsHtml}</div>`;
+      }
       if (messageHasAttachments(message)) {
         const textHtml = message.content_text
           ? `<div class="body-text">${useHighlight ? highlightSearchHtml(message.content_text || "", highlightQuery) : escapeHtml(message.content_text || "")}</div>`
@@ -4684,6 +5132,7 @@ HTML_TEMPLATE = """<!doctype html>
         ? highlightSearchHtml(displayMessageType(message), highlightQuery)
         : escapeHtml(displayMessageType(message));
       const bodyHtml = renderMessageBody(message, thread, highlightQuery);
+      const reactionsHtml = renderMessageReactions(message, highlightQuery);
       const hiddenMeta = messageHiddenMeta(message);
       const collapsibleSystemEvent = systemMessage && !messageIsCallEvent(message);
       const hasCollapsibleContent = Boolean((hiddenMeta && hiddenMeta.count > 0) || collapsibleSystemEvent);
@@ -4736,6 +5185,7 @@ HTML_TEMPLATE = """<!doctype html>
                 </summary>
                 <div class="msg-body-wrap">
                   ${bodyHtml}
+                  ${reactionsHtml}
                 </div>
               </details>
             </div>
@@ -4750,6 +5200,7 @@ HTML_TEMPLATE = """<!doctype html>
             <div ${shellAttrs}>
               ${headerHtml}
               ${bodyHtml}
+              ${reactionsHtml}
             </div>
           </div>
         </article>
@@ -5631,11 +6082,15 @@ MESSAGE_FIELDS = (
     "sender_id",
     "message_type",
     "content_text",
+    "reactions",
     "attachments",
     "quality",
 )
 MESSAGE_ATTACHMENT_FIELDS = ("id", "name", "url", "preview_url", "kind")
+MESSAGE_REACTION_FIELDS = ("key", "count", "users")
+MESSAGE_REACTION_USER_FIELDS = ("id", "display_name", "reacted_at")
 MESSAGE_HTML_TYPES = frozenset({"ThreadActivity/TopicUpdate"})
+REPLY_QUOTE_HTML_MARKER = "schema.skype.com/reply"
 CALL_FIELDS = (
     "call_id",
     "call_state",
@@ -5676,11 +6131,25 @@ def pick_fields(payload: dict | None, allowed_fields: tuple[str, ...]) -> dict:
 
 def build_message_payload(message: dict) -> dict:
     row = pick_fields(message, MESSAGE_FIELDS)
-    if message.get("message_type") in MESSAGE_HTML_TYPES and message.get("content_html"):
-        row["content_html"] = message["content_html"]
+    content_html = message.get("content_html")
+    if content_html and (
+        message.get("message_type") in MESSAGE_HTML_TYPES
+        or REPLY_QUOTE_HTML_MARKER in str(content_html).lower()
+    ):
+        row["content_html"] = content_html
     row["attachments"] = [
         pick_fields(attachment, MESSAGE_ATTACHMENT_FIELDS)
         for attachment in (message.get("attachments") or [])
+    ]
+    row["reactions"] = [
+        {
+            **pick_fields(reaction, MESSAGE_REACTION_FIELDS),
+            "users": [
+                pick_fields(user, MESSAGE_REACTION_USER_FIELDS)
+                for user in (reaction.get("users") or [])
+            ],
+        }
+        for reaction in (message.get("reactions") or [])
     ]
     return row
 

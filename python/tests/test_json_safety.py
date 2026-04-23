@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from teams_ccl_common import clean_text, normalize_json_value, write_json
+from teams_ccl_common import clean_text, html_to_text, normalize_json_value, write_json
 
 
 class _Undefined:
@@ -16,6 +16,16 @@ class _Undefined:
 
 
 class JsonSafetyTests(unittest.TestCase):
+    def test_html_to_text_preserves_inline_emoji_images(self) -> None:
+        html = (
+            '<p><span title="Party popper" type="(1f389_partypopper)" class="animated-emoticon-20-1f389_partypopper" itemscope>'
+            '<img itemscope itemtype="http://schema.skype.com/Emoji" itemid="1f389_partypopper" '
+            'src="https://example.test/party.png" title="Party popper" alt="🎉" style="width:20px;height:20px" />'
+            "</span></p>"
+        )
+
+        self.assertEqual(html_to_text(html), "🎉")
+
     def test_normalize_json_value_converts_ccl_undefined_sentinel(self) -> None:
         payload = {"metadata": {"topic": _Undefined()}, "values": ["<Undefined>", ("ok", _Undefined())]}
 

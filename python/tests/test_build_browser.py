@@ -12,14 +12,14 @@ from build_teams_ccl_browser import build_browser, build_browser_payload
 class BuildBrowserPayloadTests(unittest.TestCase):
     def build_export_data(self) -> dict:
         return {
-            "summary": {"threads_total": 1, "messages_total": 3, "calls_total": 0},
+            "summary": {"threads_total": 1, "messages_total": 4, "calls_total": 0},
             "profile": {"oid": "user-1", "display_name": "Example User"},
             "threads": [
                 {
                     "id": "19:thread@thread.v2",
                     "category": "thread",
                     "label": "Example Thread",
-                    "message_count": 3,
+                    "message_count": 4,
                     "messages": [
                         {
                             "id": "m1",
@@ -29,6 +29,23 @@ class BuildBrowserPayloadTests(unittest.TestCase):
                             "message_type": "RichText/Html",
                             "content_html": "<div><strong>Hello</strong></div>",
                             "content_text": "Hello",
+                            "reactions": [
+                                {
+                                    "key": "like",
+                                    "count": 2,
+                                    "users": [
+                                        {"id": "user-1", "display_name": "Example User", "reacted_at": "2025-01-01T00:05:00+00:00"},
+                                        {"id": "user-3", "display_name": "Bob", "reacted_at": "2025-01-01T00:06:00+00:00"},
+                                    ],
+                                },
+                                {
+                                    "key": "heart",
+                                    "count": 1,
+                                    "users": [
+                                        {"id": "user-4", "display_name": "Cara", "reacted_at": "2025-01-01T00:07:00+00:00"},
+                                    ],
+                                },
+                            ],
                             "quality": "curated",
                         },
                         {
@@ -58,6 +75,22 @@ class BuildBrowserPayloadTests(unittest.TestCase):
                                 }
                             ],
                         },
+                        {
+                            "id": "m4",
+                            "timestamp": "2025-01-01T00:03:00+00:00",
+                            "sender_display_name": "Alice",
+                            "sender_id": "user-2",
+                            "message_type": "RichText/Html",
+                            "content_html": (
+                                '<blockquote itemscope itemtype="http://schema.skype.com/Reply" itemid="m1">'
+                                '<strong itemprop="mri">Example User</strong>'
+                                '<p itemprop="preview">Hello</p>'
+                                "</blockquote>"
+                                "<p>Follow up</p>"
+                            ),
+                            "content_text": "Example User Hello Follow up",
+                            "quality": "curated",
+                        },
                     ],
                     "metadata": {"topic": "Topic"},
                     "meeting": {"subject": "Subject"},
@@ -69,7 +102,7 @@ class BuildBrowserPayloadTests(unittest.TestCase):
             "guid_directory": {"user-2": "Alice"},
         }
 
-    def test_payload_keeps_html_only_for_topic_updates(self) -> None:
+    def test_payload_keeps_html_for_topic_updates_and_reply_quotes(self) -> None:
         export_data = self.build_export_data()
 
         payload = build_browser_payload(export_data)
@@ -77,6 +110,10 @@ class BuildBrowserPayloadTests(unittest.TestCase):
 
         self.assertNotIn("content_html", messages[0])
         self.assertEqual(messages[1]["content_html"], "<value>New Topic</value>")
+        self.assertIn("content_html", messages[3])
+        self.assertIn("schema.skype.com/Reply", messages[3]["content_html"])
+        self.assertEqual(messages[0]["reactions"][0]["key"], "like")
+        self.assertEqual(messages[0]["reactions"][0]["users"][0]["display_name"], "Example User")
         self.assertEqual(messages[2]["attachments"][0]["name"], "report.pdf")
         self.assertTrue(payload["threads"][0]["csv_path"].endswith(".csv"))
 
@@ -93,6 +130,12 @@ class BuildBrowserPayloadTests(unittest.TestCase):
         self.assertIn("data-message-id", html)
         self.assertIn("focusMessageId", html)
         self.assertIn("centerElementInContainer", html)
+        self.assertIn("function messageReplyQuote", html)
+        self.assertIn("reply-quote", html)
+        self.assertIn("reaction-bubble", html)
+        self.assertIn("function renderMessageReactions", html)
+        self.assertIn("Example User", html)
+        self.assertIn("👍", html)
 
     def test_generated_html_preserves_display_name_suffixes(self) -> None:
         export_data = self.build_export_data()

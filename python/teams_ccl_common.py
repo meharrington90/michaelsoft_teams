@@ -20,6 +20,9 @@ GUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]+")
 MULTISPACE_RE = re.compile(r"\s+")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
+HTML_ATTR_RE = re.compile(r"([A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*(['\"])(.*?)\2", re.S)
+HTML_EMOJI_IMG_RE = re.compile(r"<img\b(?=[^>]*\bitemtype=(['\"])http://schema\.skype\.com/Emoji\1)[^>]*>", re.I)
+EMOJI_CODEPOINT_RE = re.compile(r"^[0-9a-f]{4,6}(?:-[0-9a-f]{4,6})*$", re.I)
 PROFILE_RE = re.compile(
     r'"displayName":"([^"]+)".+?"email":"([^"]+)".+?"tenantId":"([^"]+)".+?"oid":"([^"]+)"',
     re.S,
@@ -56,10 +59,38 @@ def clean_text(value: str | None) -> str | None:
     return value.strip() or None
 
 
+def emoji_from_identifier(value: str | None) -> str | None:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return None
+    codepoints = cleaned.strip("()").split("_", 1)[0]
+    if not EMOJI_CODEPOINT_RE.fullmatch(codepoints):
+        return None
+    try:
+        return "".join(chr(int(codepoint, 16)) for codepoint in codepoints.split("-"))
+    except ValueError:
+        return None
+
+
+def replace_emoji_img_with_text(match: re.Match[str]) -> str:
+    tag = match.group(0)
+    attrs = {
+        name.lower(): unescape(value)
+        for name, _, value in HTML_ATTR_RE.findall(tag)
+    }
+    return (
+        clean_text(attrs.get("alt"))
+        or emoji_from_identifier(attrs.get("itemid"))
+        or emoji_from_identifier(attrs.get("type"))
+        or " "
+    )
+
+
 def html_to_text(value: str | None) -> str | None:
     if value is None:
         return None
     value = value.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    value = HTML_EMOJI_IMG_RE.sub(replace_emoji_img_with_text, value)
     value = HTML_TAG_RE.sub(" ", value)
     value = unescape(value)
     return clean_text(value)
