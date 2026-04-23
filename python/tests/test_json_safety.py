@@ -34,6 +34,20 @@ class JsonSafetyTests(unittest.TestCase):
         self.assertEqual(normalized, {"metadata": {"topic": None}, "values": [None, ["ok", None]]})
         json.dumps(normalized)
 
+    def test_normalize_json_value_converts_bytes_to_preview_object(self) -> None:
+        payload = {"blob": b"\x00\x01hello", "nested": [bytearray(b"\xff\x10")]}
+
+        normalized = normalize_json_value(payload)
+
+        self.assertEqual(
+            normalized,
+            {
+                "blob": {"type": "bytes", "length": 7, "preview_hex": "000168656c6c6f"},
+                "nested": [{"type": "bytes", "length": 2, "preview_hex": "ff10"}],
+            },
+        )
+        json.dumps(normalized)
+
     def test_clean_text_treats_ccl_undefined_as_empty(self) -> None:
         self.assertIsNone(clean_text(_Undefined()))
 

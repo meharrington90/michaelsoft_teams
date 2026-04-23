@@ -1,0 +1,115 @@
+{
+  "backend": "ccl_chromium_reader.wrapper",
+  "platform": "macos",
+  "search_root": "/Users/meharrington/Github/TEAMS/Library/TeamsSourceArchive/current/profile",
+  "profile_root": "/Users/meharrington/Github/TEAMS/Library/TeamsSourceArchive/current/profile",
+  "leveldb_path": "/Users/meharrington/Github/TEAMS/Library/TeamsSourceArchive/current/profile/IndexedDB/https_teams.microsoft.com_0.indexeddb.leveldb",
+  "blob_path": "/Users/meharrington/Github/TEAMS/Library/TeamsSourceArchive/current/profile/IndexedDB/https_teams.microsoft.com_0.indexeddb.blob",
+  "local_storage_dir": "/Users/meharrington/Github/TEAMS/Library/TeamsSourceArchive/current/profile/Local Storage/leveldb",
+  "discovery_method": "profile-root",
+  "databases_total": 102,
+  "key_stores": {
+    "people": {
+      "found": true,
+      "record_count": 424
+    },
+    "conversations": {
+      "found": true,
+      "record_count": 366
+    },
+    "replychains": {
+      "found": true,
+      "record_count": 12178,
+      "messages_total": 12311,
+      "threads_with_messages": 12178
+    },
+    "call_history": {
+      "found": true,
+      "record_count": 125
+    },
+    "threads_internal": {
+      "found": true,
+      "record_count": 3
+    },
+    "drafts_internal": {
+      "found": true,
+      "record_count": 3
+    },
+    "system_messages": {
+      "found": true,
+      "record_count": 13
+    }
+  },
+  "samples": {
+    "people": {
+      "DisplayName": "Lynn, Nichole C (FCS)",
+      "EmailAddresses": [
+        "nichole.lynn@alaska.gov"
+      ],
+      "ExternalDirectoryObjectId": "00539a4a-389a-45d2-802d-8ff646f2d57b"
+    },
+    "conversations": {
+      "id": "19:1f47b2ad-df38-4829-a245-2277385b16f4_725ddef3-faa9-4b70-9d71-9ef7561e2f2b@unq.gbl.spaces",
+      "type": "Chat",
+      "title": null,
+      "member_count": 2
+    },
+    "replychains": {
+      "conversationId": "19:1f47b2ad-df38-4829-a245-2277385b16f4_725ddef3-faa9-4b70-9d71-9ef7561e2f2b@unq.gbl.spaces",
+      "replyChainId": "1776968421638",
+      "messageMap_count": 1,
+      "first_message": {
+        "id": "1776968421638",
+        "imDisplayName": "Denmon, Yvonne L (FCS)",
+        "messageType": "RichText/Html",
+        "content_preview": {
+          "type": "bytes",
+          "length": 29,
+          "preview_hex": "3c703e49207761732061626c6520746f206164642069742ea03c2f703e"
+        }
+      }
+    },
+    "call_history": {
+      "id": "00ac1f44-1c1c-4397-b51c-19e168a0dbfc;personal:primary:4:19074515057",
+      "callDirection": "Outgoing",
+      "callType": "TwoParty",
+      "callState": "Accepted",
+      "originator": "Harrington, Mike E (FCS)",
+      "target": null
+    },
+    "threads_internal": {
+      "id": "charms",
+      "value": {
+        "chat": {
+          "totalCount": 0,
+          "unreadCount": 0
+        },
+        "channel": {
+          "totalCount": 0,
+          "unreadCount": 0
+        }
+      }
+    },
+    "drafts_internal": {
+      "id": "charms",
+      "value": {
+        "chat": {
+          "totalCount": 0,
+          "unreadCount": 0
+        },
+        "channel": {
+          "totalCount": 0,
+          "unreadCount": 0
+        }
+      }
+    },
+    "system_messages": {
+      "id": "1726855742822",
+      "composeTime": "2024-09-20T18:09:02.822Z",
+      "messageType": "ThreadActivity/AddMember",
+      "content": "<addmember><target>8:orgid:725ddef3-faa9-4b70-9d71-9ef7561e2f2b</target><target>8:orgid:5133c1cf-3fcf-496b-a0f0-41377230052b</target><eventtime>1726855742812</eventtime><rosterVersion>1726855742626</rosterVersion><lastRosterVersion>1723587693586</lastRosterVersion><initiator>8:orgid:e2dd2863-51b6-40b5-85db-e602e0b1f5df</initiator></addmember>",
+      "from": "19:896163fceb6d42deb2782a3058b51454@thread.skype",
+      "properties": {}
+    }
+  }
+}

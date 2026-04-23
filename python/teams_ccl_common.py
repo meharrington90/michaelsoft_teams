@@ -109,6 +109,8 @@ def ensure_dir(path: Path) -> None:
 def normalize_json_value(value: Any) -> Any:
     if is_undefined_value(value):
         return None
+    if isinstance(value, (bytes, bytearray)):
+        return {"type": "bytes", "length": len(value), "preview_hex": bytes(value[:32]).hex()}
     if isinstance(value, dict):
         return {str(key): normalize_json_value(item) for key, item in value.items()}
     if isinstance(value, list):
