@@ -24,6 +24,32 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict]) -> None:
             writer.writerow(row)
 
 
+def reaction_count(reactions: list[dict] | None) -> int:
+    total = 0
+    for reaction in reactions or []:
+        try:
+            count = int(reaction.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        total += max(count, len(reaction.get("users") or []))
+    return total
+
+
+def reaction_summary(reactions: list[dict] | None) -> str:
+    parts = []
+    for reaction in reactions or []:
+        key = reaction.get("key")
+        if not key:
+            continue
+        try:
+            raw_count = int(reaction.get("count") or 0)
+        except (TypeError, ValueError):
+            raw_count = 0
+        count = max(raw_count, len(reaction.get("users") or []))
+        parts.append(f"{key}:{count}")
+    return "; ".join(parts)
+
+
 def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
     messages_dir = output_dir / "conversations"
     ensure_dir(messages_dir)
@@ -43,6 +69,11 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
         "content_type",
         "quality",
         "content_text",
+        "attachment_count",
+        "attachment_names",
+        "attachment_urls",
+        "reaction_count",
+        "reactions",
         "source",
     ]
     ordered_threads = sorted(export_data.get("threads", []), key=lambda thread: ((thread.get("label") or ""), thread.get("id") or ""))
@@ -61,6 +92,8 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
                     thread_writer.writeheader()
 
                     for message in thread_messages:
+                        attachments = message.get("attachments") or []
+                        reactions = message.get("reactions") or []
                         row = {
                             "thread_id": thread["id"],
                             "thread_label": thread.get("label"),
@@ -75,6 +108,18 @@ def export_conversations(export_data: dict, output_dir: Path) -> list[dict]:
                             "content_type": message.get("content_type"),
                             "quality": message.get("quality"),
                             "content_text": message.get("content_text"),
+                            "attachment_count": len(attachments),
+                            "attachment_names": "; ".join(
+                                filter(None, (attachment.get("name") for attachment in attachments))
+                            ),
+                            "attachment_urls": "; ".join(
+                                filter(
+                                    None,
+                                    (attachment.get("url") or attachment.get("preview_url") for attachment in attachments),
+                                )
+                            ),
+                            "reaction_count": reaction_count(reactions),
+                            "reactions": reaction_summary(reactions),
                             "source": message.get("source"),
                         }
                         thread_writer.writerow(row)

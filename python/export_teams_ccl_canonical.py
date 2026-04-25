@@ -58,6 +58,35 @@ EVENT_CALL_STATE_PRIORITY = {
 }
 ATTACHMENT_IMAGE_TYPES = {"png", "jpg", "jpeg", "gif", "bmp", "webp", "heic", "heif", "tif", "tiff"}
 ATTACHMENT_VIDEO_TYPES = {"mp4", "mov", "avi", "wmv", "m4v", "webm"}
+ATTACHMENT_DOCUMENT_TYPES = {
+    "csv",
+    "doc",
+    "docx",
+    "key",
+    "numbers",
+    "pages",
+    "pdf",
+    "ppt",
+    "pptx",
+    "rtf",
+    "txt",
+    "xls",
+    "xlsx",
+    "zip",
+}
+ATTACHMENT_URL_HOST_HINTS = (
+    "api.ams.",
+    "api.asm.",
+    "sharepoint.com",
+    "onedrive.live.com",
+    "1drv.ms",
+)
+MESSAGE_QUALITY_RANK = {
+    "residual": 0,
+    "event": 1,
+    "attachment": 2,
+    "curated": 3,
+}
 
 
 def safe_text(value) -> str | None:
@@ -65,6 +94,14 @@ def safe_text(value) -> str | None:
         return clean_text(value)
     if isinstance(value, (bytes, bytearray)):
         return clean_text(bytes(value).decode("utf-8", "ignore"))
+    return None
+
+
+def first_text(*values) -> str | None:
+    for value in values:
+        cleaned = safe_text(value)
+        if cleaned:
+            return cleaned
     return None
 
 
@@ -114,13 +151,35 @@ def classify_quality(message_type: str | None, content_text: str | None) -> str:
 def parse_json_list(value) -> list[dict]:
     if isinstance(value, list):
         return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        for nested_key in ("items", "files", "attachments", "value", "values"):
+            nested = parse_json_list(value.get(nested_key))
+            if nested:
+                return nested
+        attachment_like_keys = {
+            "baseUrl",
+            "contentUrl",
+            "downloadUrl",
+            "fileInfo",
+            "filePreview",
+            "fileUrl",
+            "href",
+            "objectUrl",
+            "previewUrl",
+            "shareUrl",
+            "thumbnailUrl",
+            "url",
+        }
+        if attachment_like_keys.intersection(value):
+            return [value]
+        return [item for item in value.values() if isinstance(item, dict)]
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError:
             return []
-        if isinstance(parsed, list):
-            return [item for item in parsed if isinstance(item, dict)]
+        if isinstance(parsed, (dict, list)):
+            return parse_json_list(parsed)
     return []
 
 
@@ -149,9 +208,35 @@ def file_name_from_url(value: str | None) -> str | None:
     return clean_text(name) or None
 
 
+def url_host(value: str | None) -> str:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return ""
+    try:
+        return (urlparse(cleaned).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def is_likely_attachment_url(value: str | None) -> bool:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return False
+    host = url_host(cleaned)
+    if any(hint in host for hint in ATTACHMENT_URL_HOST_HINTS):
+        return True
+    name = file_name_from_url(cleaned) or cleaned
+    if "." not in name:
+        return False
+    extension = name.rsplit(".", 1)[-1].lower().split("?", 1)[0].split("#", 1)[0]
+    return extension in ATTACHMENT_IMAGE_TYPES | ATTACHMENT_VIDEO_TYPES | ATTACHMENT_DOCUMENT_TYPES
+
+
 def attachment_kind(name: str | None, url: str | None, file_type: str | None = None) -> str:
     raw_type = clean_text(file_type) or ""
     if raw_type.startswith("http://schema.skype.com/"):
+        raw_type = raw_type.rsplit("/", 1)[-1]
+    elif "/" in raw_type:
         raw_type = raw_type.rsplit("/", 1)[-1]
     raw_type = raw_type.lower()
     if not raw_type:
@@ -165,6 +250,18 @@ def attachment_kind(name: str | None, url: str | None, file_type: str | None = N
     return "file"
 
 
+def attachment_identity_tokens(attachment: dict) -> set[str]:
+    tokens = set()
+    attachment_id = clean_text(attachment.get("id"))
+    if attachment_id:
+        tokens.add(f"id:{attachment_id.lower()}")
+    for field in ("url", "preview_url"):
+        link = clean_text(attachment.get(field))
+        if link:
+            tokens.add(f"url:{link}")
+    return tokens
+
+
 def append_attachment(attachments: list[dict], attachment: dict | None) -> None:
     if not isinstance(attachment, dict):
         return
@@ -175,23 +272,84 @@ def append_attachment(attachments: list[dict], attachment: dict | None) -> None:
     }
     if not cleaned.get("url") and not cleaned.get("preview_url"):
         return
-    identity = (
-        cleaned.get("id") or "",
-        cleaned.get("url") or "",
-        cleaned.get("preview_url") or "",
-        cleaned.get("name") or "",
-    )
-    if any(
-        (
-            existing.get("id") or "",
-            existing.get("url") or "",
-            existing.get("preview_url") or "",
-            existing.get("name") or "",
-        ) == identity
-        for existing in attachments
-    ):
+    identity = attachment_identity_tokens(cleaned)
+    if identity and any(identity & attachment_identity_tokens(existing) for existing in attachments):
         return
     attachments.append(cleaned)
+
+
+def merge_attachment_lists(*attachment_lists: list[dict] | None) -> list[dict]:
+    merged: list[dict] = []
+    for attachments in attachment_lists:
+        for attachment in attachments or []:
+            append_attachment(merged, attachment)
+    return merged
+
+
+def attachment_from_object(item: dict) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+
+    file_info = item.get("fileInfo") or item.get("file_info") or {}
+    preview = item.get("filePreview") or item.get("file_preview") or {}
+    if not isinstance(file_info, dict):
+        file_info = {}
+    if not isinstance(preview, dict):
+        preview = {}
+
+    url = first_text(
+        file_info.get("shareUrl"),
+        file_info.get("fileUrl"),
+        file_info.get("contentUrl"),
+        item.get("shareUrl"),
+        item.get("fileUrl"),
+        item.get("contentUrl"),
+        item.get("downloadUrl"),
+        item.get("objectUrl"),
+        item.get("baseUrl"),
+        item.get("url"),
+        item.get("href"),
+    )
+    preview_url = first_text(
+        preview.get("previewUrl"),
+        preview.get("thumbnailUrl"),
+        item.get("previewUrl"),
+        item.get("thumbnailUrl"),
+        item.get("preview_url"),
+    )
+    if not url and not preview_url:
+        return None
+
+    name = (
+        first_text(
+            item.get("fileName"),
+            item.get("name"),
+            item.get("title"),
+            item.get("displayName"),
+            item.get("contentName"),
+            file_info.get("fileName"),
+            file_info.get("name"),
+            file_info.get("title"),
+        )
+        or file_name_from_url(url or preview_url)
+        or "File"
+    )
+    file_type = first_text(
+        item.get("fileType"),
+        item.get("contentType"),
+        item.get("type"),
+        item.get("itemType"),
+        file_info.get("fileType"),
+        file_info.get("contentType"),
+        file_info.get("type"),
+    )
+    return {
+        "id": first_text(item.get("itemid"), item.get("itemId"), item.get("id"), item.get("fileId"), item.get("objectId")),
+        "name": name,
+        "url": url,
+        "preview_url": preview_url,
+        "kind": attachment_kind(name, url or preview_url, file_type),
+    }
 
 
 class MessageAttachmentHtmlParser(HTMLParser):
@@ -207,9 +365,14 @@ class MessageAttachmentHtmlParser(HTMLParser):
         if tag.lower() == "img":
             if lowered_type.endswith("/emoji"):
                 return
-            if "amsimage" not in lowered_type and "inlineimage" not in lowered_type and "amsvideo" not in lowered_type:
-                return
             src = clean_text(attrs_dict.get("src"))
+            if (
+                "amsimage" not in lowered_type
+                and "inlineimage" not in lowered_type
+                and "amsvideo" not in lowered_type
+                and not is_likely_attachment_url(src)
+            ):
+                return
             name = clean_text(attrs_dict.get("alt")) or ("Video" if "amsvideo" in lowered_type else "Image")
             append_attachment(
                 self.attachments,
@@ -225,7 +388,11 @@ class MessageAttachmentHtmlParser(HTMLParser):
 
         if tag.lower() == "a":
             href = clean_text(attrs_dict.get("href"))
-            if "hyperlink/files" not in lowered_type and "fileshyperlink" not in lowered_type:
+            if (
+                "hyperlink/files" not in lowered_type
+                and "fileshyperlink" not in lowered_type
+                and not is_likely_attachment_url(href)
+            ):
                 return
             name = clean_text(attrs_dict.get("title")) or file_name_from_url(href) or "File"
             append_attachment(
@@ -253,28 +420,27 @@ def extract_html_attachments(content_html: str | None) -> list[dict]:
 def extract_message_attachments(raw: dict, content_html: str | None) -> list[dict]:
     attachments: list[dict] = []
     properties = raw.get("properties") or {}
-    files = parse_json_list(properties.get("files")) if isinstance(properties, dict) else []
-    for item in files:
-        file_info = item.get("fileInfo") or {}
-        preview = item.get("filePreview") or {}
-        url = (
-            clean_text(file_info.get("shareUrl"))
-            or clean_text(file_info.get("fileUrl"))
-            or clean_text(item.get("objectUrl"))
-            or clean_text(item.get("baseUrl"))
+    attachment_sources = [
+        raw.get("attachments"),
+        raw.get("files"),
+        raw.get("amsReferences"),
+        raw.get("amsreferences"),
+    ]
+    if isinstance(properties, dict):
+        attachment_sources.extend(
+            properties.get(key)
+            for key in (
+                "attachments",
+                "files",
+                "links",
+                "amsReferences",
+                "amsreferences",
+            )
         )
-        preview_url = clean_text(preview.get("previewUrl")) or clean_text(item.get("previewUrl"))
-        name = clean_text(item.get("fileName") or item.get("title")) or file_name_from_url(url) or "File"
-        append_attachment(
-            attachments,
-            {
-                "id": clean_text(item.get("itemid") or item.get("id")),
-                "name": name,
-                "url": url,
-                "preview_url": preview_url,
-                "kind": attachment_kind(name, url, item.get("fileType") or item.get("type")),
-            },
-        )
+
+    for source in attachment_sources:
+        for item in parse_json_list(source):
+            append_attachment(attachments, attachment_from_object(item))
 
     for attachment in extract_html_attachments(content_html):
         append_attachment(attachments, attachment)
@@ -345,6 +511,119 @@ def extract_message_reactions(raw: dict, guid_to_name: dict[str, str]) -> list[d
             }
         )
     return sorted(normalized, key=lambda item: (-int(item.get("count") or 0), item.get("key") or ""))
+
+
+def reaction_total(reactions: list[dict] | None) -> int:
+    total = 0
+    for reaction in reactions or []:
+        try:
+            count = int(reaction.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        total += max(count, len(reaction.get("users") or []))
+    return total
+
+
+def merge_reaction_lists(*reaction_lists: list[dict] | None) -> list[dict]:
+    merged: dict[str, dict] = {}
+    for reactions in reaction_lists:
+        for reaction in reactions or []:
+            key = (safe_text(reaction.get("key")) or "").lower()
+            if not key:
+                continue
+            entry = merged.setdefault(key, {"key": key, "count": 0, "users": []})
+            try:
+                count = int(reaction.get("count") or 0)
+            except (TypeError, ValueError):
+                count = 0
+            entry["count"] = max(entry["count"], count)
+
+            seen_users = {
+                (existing.get("id") or "", existing.get("display_name") or "", existing.get("reacted_at") or "")
+                for existing in entry["users"]
+                if isinstance(existing, dict)
+            }
+            for user in reaction.get("users") or []:
+                if not isinstance(user, dict):
+                    continue
+                cleaned_user = {
+                    field: value
+                    for field, value in {
+                        "id": extract_guid(user.get("id")),
+                        "display_name": safe_text(user.get("display_name")),
+                        "reacted_at": safe_text(user.get("reacted_at")),
+                    }.items()
+                    if value is not None and value != ""
+                }
+                identity = (
+                    cleaned_user.get("id") or "",
+                    cleaned_user.get("display_name") or "",
+                    cleaned_user.get("reacted_at") or "",
+                )
+                if identity in seen_users:
+                    continue
+                seen_users.add(identity)
+                if cleaned_user:
+                    entry["users"].append(cleaned_user)
+            entry["count"] = max(entry["count"], len(entry["users"]))
+
+    return sorted(
+        merged.values(),
+        key=lambda item: (-max(int(item.get("count") or 0), len(item.get("users") or [])), item.get("key") or ""),
+    )
+
+
+def message_richness_score(message: dict) -> tuple[int, int, int, int, int, int]:
+    content_text = message.get("content_text") or ""
+    attachments = message.get("attachments") or []
+    reactions = message.get("reactions") or []
+    return (
+        MESSAGE_QUALITY_RANK.get(message.get("quality") or "", 0),
+        1 if content_text else 0,
+        len(content_text),
+        len(attachments),
+        reaction_total(reactions),
+        1 if message.get("content_html") else 0,
+    )
+
+
+def merge_message_records(existing: dict, candidate: dict) -> dict:
+    if message_richness_score(candidate) > message_richness_score(existing):
+        primary = dict(candidate)
+        secondary = existing
+    else:
+        primary = dict(existing)
+        secondary = candidate
+
+    for field in [
+        "client_message_id",
+        "timestamp",
+        "sender_display_name",
+        "sender_id",
+        "message_type",
+        "content_type",
+        "content_html",
+        "content_text",
+        "source",
+    ]:
+        if not primary.get(field) and secondary.get(field):
+            primary[field] = secondary[field]
+
+    attachments = merge_attachment_lists(primary.get("attachments"), secondary.get("attachments"))
+    if attachments:
+        primary["attachments"] = attachments
+    else:
+        primary.pop("attachments", None)
+
+    reactions = merge_reaction_lists(primary.get("reactions"), secondary.get("reactions"))
+    if reactions:
+        primary["reactions"] = reactions
+    else:
+        primary.pop("reactions", None)
+
+    if primary.get("attachments") and primary.get("quality") == "residual":
+        primary["quality"] = "attachment"
+    return primary
 
 
 def flatten_members(members: list[dict], guid_to_name: dict[str, str]) -> tuple[list[str], list[str]]:
@@ -449,9 +728,12 @@ def parse_iso_datetime(value: str | None) -> datetime | None:
     if not cleaned:
         return None
     try:
-        return datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def normalize_meeting_datetime_value(value: str | None) -> str | None:
@@ -464,6 +746,13 @@ def normalize_meeting_datetime_value(value: str | None) -> str | None:
     if parsed is not None and parsed.year <= 1:
         return None
     return cleaned
+
+
+def iso_bounds(values: list[str | None]) -> tuple[str | None, str | None]:
+    parsed_values = [parsed for parsed in (parse_iso_datetime(value) for value in values) if parsed is not None]
+    if not parsed_values:
+        return None, None
+    return min(parsed_values).isoformat(), max(parsed_values).isoformat()
 
 
 def normalize_phone_number(value: str | None) -> str | None:
@@ -726,7 +1015,13 @@ def merge_call_records(existing: dict, candidate: dict) -> None:
         if not existing.get("end_time") or candidate["end_time"] > existing["end_time"]:
             existing["end_time"] = candidate["end_time"]
 
-    if call_state_priority(candidate.get("call_state")) >= call_state_priority(existing.get("call_state")):
+    candidate_state_priority = call_state_priority(candidate.get("call_state"))
+    existing_state_priority = call_state_priority(existing.get("call_state"))
+    if candidate.get("call_state") and (
+        not existing.get("call_state")
+        or candidate_state_priority > existing_state_priority
+        or (candidate_state_priority == existing_state_priority and candidate_state_priority >= 0)
+    ):
         existing["call_state"] = candidate.get("call_state")
 
     for list_field in ["participant_ids", "participant_display_names", "source_event_message_ids"]:
@@ -1214,15 +1509,14 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                     }
                     if reactions:
                         message["reactions"] = reactions
-                    message = {key: value for key, value in message.items() if value is not None and value != ""}
+                    message = {key: value for key, value in message.items() if value is not None and value != "" and value != []}
 
                     key = (thread_id, message_id)
                     existing = best_messages.get(key)
-                    if existing is None or (
-                        (message.get("quality") == "curated") > (existing.get("quality") == "curated")
-                        or len(message.get("content_text", "")) > len(existing.get("content_text", ""))
-                    ):
+                    if existing is None:
                         best_messages[key] = message
+                    else:
+                        best_messages[key] = merge_message_records(existing, message)
         update_store_summary(
             "replychains",
             replychains_count,
@@ -1326,11 +1620,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
         if existing is None and shared_correlation_id:
             existing = structured_by_shared_correlation_id.get(shared_correlation_id)
         if existing is not None:
-            for field, value in call.items():
-                if field in {"quality", "source"}:
-                    continue
-                if value and not existing.get(field):
-                    existing[field] = value
+            merge_call_records(existing, call)
             continue
         calls.append(call)
 
@@ -1408,14 +1698,31 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
             item["label"],
         ),
     )
+    ordered_messages = [message for thread in ordered_threads for message in thread.get("messages", [])]
+    first_message_at, last_message_at = iso_bounds([message.get("timestamp") for message in ordered_messages])
+    first_call_at, last_call_at = iso_bounds(
+        [
+            value
+            for call in calls
+            for value in (call.get("start_time"), call.get("connect_time"), call.get("end_time"))
+        ]
+    )
 
     summary = {
         "threads_total": len(ordered_threads),
         "threads_with_detail": sum(thread["metadata_quality"] == "detailed" for thread in ordered_threads),
         "threads_with_messages": sum(bool(thread["messages"]) for thread in ordered_threads),
         "messages_total": sum(thread["message_count"] for thread in ordered_threads),
+        "messages_with_attachments": sum(bool(message.get("attachments")) for message in ordered_messages),
+        "messages_with_reactions": sum(bool(message.get("reactions")) for message in ordered_messages),
+        "attachments_total": sum(len(message.get("attachments") or []) for message in ordered_messages),
+        "reactions_total": sum(reaction_total(message.get("reactions")) for message in ordered_messages),
         "calls_total": len(calls),
         "people_total": len(guid_to_name),
+        "first_message_at": first_message_at,
+        "last_message_at": last_message_at,
+        "first_call_at": first_call_at,
+        "last_call_at": last_call_at,
     }
 
     payload = {
@@ -1437,7 +1744,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
         "limitations": [
             "Built from structured IndexedDB object stores using ccl_chromium_reader and the matching blob directory.",
             "A small number of keys reported decode errors during CCL iteration and may be missing from this export.",
-            "This canonical export now surfaces inline image/file attachments and message reaction summaries from replychains, but it still does not merge every auxiliary store such as notification surfaces.",
+            "This canonical export surfaces replychain attachments and reaction summaries, but it still does not merge every auxiliary store such as notification surfaces.",
         ],
     }
     if store_summary is not None:

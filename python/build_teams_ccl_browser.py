@@ -655,6 +655,14 @@ HTML_TEMPLATE = """<!doctype html>
       --card-geo: rgba(15,118,110,.16);
       --card-outline: rgba(15,118,110,.12);
     }
+    .attachments-card {
+      --card-geo: rgba(249,115,22,.16);
+      --card-outline: rgba(249,115,22,.12);
+    }
+    .reactions-card {
+      --card-geo: rgba(190,24,93,.13);
+      --card-outline: rgba(190,24,93,.10);
+    }
     .card .label {
       position: relative;
       z-index: 1;
@@ -1686,6 +1694,8 @@ HTML_TEMPLATE = """<!doctype html>
               <div class="card threads-card"><div class="label">Threads</div><div class="value" id="sumThreads"></div></div>
               <div class="card messages-card"><div class="label">Messages</div><div class="value" id="sumMessages"></div></div>
               <div class="card calls-card"><div class="label">Calls</div><div class="value" id="sumCalls"></div></div>
+              <div class="card attachments-card"><div class="label">Attachments</div><div class="value" id="sumAttachments"></div></div>
+              <div class="card reactions-card"><div class="label">Reactions</div><div class="value" id="sumReactions"></div></div>
             </div>
           </section>
           <section id="contentPanel" class="panel content-panel"></section>
@@ -1822,6 +1832,8 @@ HTML_TEMPLATE = """<!doctype html>
     document.getElementById("sumThreads").textContent = NUMBER_FORMATTER.format(DATA.summary.threads_total || 0);
     document.getElementById("sumMessages").textContent = NUMBER_FORMATTER.format(DATA.summary.messages_total || 0);
     document.getElementById("sumCalls").textContent = NUMBER_FORMATTER.format(DATA.summary.calls_total || 0);
+    document.getElementById("sumAttachments").textContent = NUMBER_FORMATTER.format(DATA.summary.attachments_total || 0);
+    document.getElementById("sumReactions").textContent = NUMBER_FORMATTER.format(DATA.summary.reactions_total || 0);
 
     function fmt(value) {
       if (!value) return "[no_time]";
@@ -6138,6 +6150,8 @@ SUMMARY_FIELDS = (
     "threads_total",
     "messages_total",
     "calls_total",
+    "attachments_total",
+    "reactions_total",
 )
 PROFILE_FIELDS = (
     "oid",

@@ -27,12 +27,15 @@ def create_fake_profile(root: Path) -> Path:
     leveldb_dir = profile_root / "IndexedDB" / TARGET_LEVELDB_DIR
     blob_dir = profile_root / "IndexedDB" / TARGET_BLOB_DIR
     local_storage_dir = profile_root / "Local Storage" / "leveldb"
+    cache_dir = profile_root / "Cache"
     leveldb_dir.mkdir(parents=True, exist_ok=True)
     blob_dir.mkdir(parents=True, exist_ok=True)
     local_storage_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
     (leveldb_dir / "000003.log").write_text("leveldb", encoding="utf-8")
     (blob_dir / "1").write_text("blob", encoding="utf-8")
     (local_storage_dir / "000004.log").write_text("profile", encoding="utf-8")
+    (cache_dir / "cache.bin").write_text("cache", encoding="utf-8")
     return profile_root
 
 
@@ -48,9 +51,11 @@ class SourceArchiveTests(unittest.TestCase):
 
             self.assertTrue((archived.profile_root / "IndexedDB" / TARGET_LEVELDB_DIR / "000003.log").exists())
             self.assertTrue((archived.profile_root / "Local Storage" / "leveldb" / "000004.log").exists())
+            self.assertFalse((archived.profile_root / "Cache" / "cache.bin").exists())
             self.assertEqual(archived.discovery_method, "repo-archive-refresh")
 
             metadata = json.loads(archive_manifest_path(archive_root).read_text(encoding="utf-8"))
+            self.assertEqual(metadata["archive_mode"], "indexeddb-local-storage")
             self.assertEqual(metadata["source_root"], str(source.profile_root))
 
     def test_refresh_source_archive_replaces_stale_lock_file(self) -> None:

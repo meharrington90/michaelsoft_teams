@@ -12,7 +12,7 @@ from build_teams_ccl_browser import build_browser, build_browser_payload
 class BuildBrowserPayloadTests(unittest.TestCase):
     def build_export_data(self) -> dict:
         return {
-            "summary": {"threads_total": 1, "messages_total": 4, "calls_total": 0},
+            "summary": {"threads_total": 1, "messages_total": 4, "calls_total": 0, "attachments_total": 1, "reactions_total": 3},
             "profile": {"oid": "user-1", "display_name": "Example User"},
             "threads": [
                 {
@@ -139,6 +139,8 @@ class BuildBrowserPayloadTests(unittest.TestCase):
         self.assertIn("reply-quote", html)
         self.assertIn("reaction-bubble", html)
         self.assertIn("function renderMessageReactions", html)
+        self.assertIn("sumAttachments", html)
+        self.assertIn("sumReactions", html)
         self.assertIn("Example User", html)
         self.assertIn("👍", html)
         self.assertNotIn("contain-intrinsic-size: 108px;", html)

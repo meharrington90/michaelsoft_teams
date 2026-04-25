@@ -151,7 +151,7 @@ def normalize_thread_id(value: str | None) -> str | None:
     value = clean_value(value)
     if value is None:
         return None
-    value = value.lstrip("[")
+    value = value.strip("[]")
     if STRICT_THREAD_ID_RE.match(value):
         return value
     return None

@@ -48,6 +48,14 @@ class ExportCsvTests(unittest.TestCase):
                             "message_type": "RichText/Html",
                             "quality": "curated",
                             "content_text": "First",
+                            "attachments": [
+                                {
+                                    "name": "report.pdf",
+                                    "url": "https://contoso.sharepoint.com/report.pdf",
+                                    "kind": "file",
+                                }
+                            ],
+                            "reactions": [{"key": "like", "count": 2, "users": []}],
                             "source": "ccl:replychains",
                         }
                     ],
@@ -74,6 +82,10 @@ class ExportCsvTests(unittest.TestCase):
 
             self.assertEqual([row["thread_label"] for row in rows], ["Alpha", "Zulu"])
             self.assertEqual(rows[0]["content_text"], "First")
+            self.assertEqual(rows[0]["attachment_count"], "1")
+            self.assertEqual(rows[0]["attachment_names"], "report.pdf")
+            self.assertEqual(rows[0]["reaction_count"], "2")
+            self.assertEqual(rows[0]["reactions"], "like:2")
             self.assertEqual(len(manifest), 2)
             self.assertTrue(manifest[0]["csv"].endswith(".csv"))
             self.assertEqual(call_rows[0]["participant_display_names"], "Alice; Bob")

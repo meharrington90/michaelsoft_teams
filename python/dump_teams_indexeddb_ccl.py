@@ -25,6 +25,18 @@ ARCHIVE_REFRESH_LOCK_NAME = ".refresh.lock"
 ARCHIVE_REFRESH_LOCK_POLL_SECONDS = 0.2
 ARCHIVE_REFRESH_LOCK_STALE_SECONDS = 3600.0
 ARCHIVE_REFRESH_LOCK_TIMEOUT_SECONDS = 120.0
+RECURSIVE_SEARCH_PRUNE_DIRS = {
+    "Cache",
+    "Code Cache",
+    "Crashpad",
+    "DawnCache",
+    "GPUCache",
+    "GrShaderCache",
+    "GraphiteDawnCache",
+    "Media Cache",
+    "ShaderCache",
+    "blob_storage",
+}
 SUMMARY_TARGETS = {
     "people": ("Teams:substrate-suggestions-manager", "people"),
     "conversations": ("Teams:conversation-manager", "conversations"),
@@ -171,6 +183,16 @@ def score_leveldb_path(leveldb_path: Path) -> tuple[int, int, int, str]:
     )
 
 
+def iter_leveldb_matches(root: Path):
+    for current_dir, dirnames, _ in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in RECURSIVE_SEARCH_PRUNE_DIRS]
+        if TARGET_LEVELDB_DIR not in dirnames:
+            continue
+        match = Path(current_dir) / TARGET_LEVELDB_DIR
+        if match.is_dir():
+            yield match
+
+
 def discover_from_root(search_root: Path) -> TeamsSourcePaths | None:
     root = search_root.expanduser().resolve()
     if not root.exists():
@@ -190,10 +212,7 @@ def discover_from_root(search_root: Path) -> TeamsSourcePaths | None:
         if leveldb_path.is_dir():
             return build_source_paths(leveldb_path, root, "known-layout")
 
-    matches = sorted(
-        (path for path in root.rglob(TARGET_LEVELDB_DIR) if path.is_dir()),
-        key=score_leveldb_path,
-    )
+    matches = sorted(iter_leveldb_matches(root), key=score_leveldb_path)
     if matches:
         return build_source_paths(matches[0], root, "recursive-search")
     return None
@@ -318,6 +337,28 @@ def get_target_stores(wrapper: Any, targets: dict[str, tuple[str, str]] | None =
     return dbs, available_stores
 
 
+def copy_pipeline_profile_artifacts(source: TeamsSourcePaths, destination_profile: Path) -> None:
+    indexeddb_destination = destination_profile / "IndexedDB"
+    indexeddb_destination.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(
+        source.leveldb_path,
+        indexeddb_destination / TARGET_LEVELDB_DIR,
+        copy_function=shutil.copy2,
+    )
+    if source.blob_path.exists():
+        shutil.copytree(
+            source.blob_path,
+            indexeddb_destination / TARGET_BLOB_DIR,
+            copy_function=shutil.copy2,
+        )
+    if source.local_storage_dir and source.local_storage_dir.exists():
+        shutil.copytree(
+            source.local_storage_dir,
+            destination_profile / "Local Storage" / "leveldb",
+            copy_function=shutil.copy2,
+        )
+
+
 def refresh_source_archive(source: TeamsSourcePaths, archive_root: Path | None = None) -> TeamsSourcePaths:
     if is_archive_source(source.profile_root, archive_root):
         return source
@@ -329,10 +370,11 @@ def refresh_source_archive(source: TeamsSourcePaths, archive_root: Path | None =
         staging_root = Path(tempfile.mkdtemp(prefix=".staging-", dir=base))
         previous_root = base / f".previous-{uuid4().hex}"
         staging_profile = staging_root / "profile"
-        shutil.copytree(source.profile_root, staging_profile, copy_function=shutil.copy2)
+        copy_pipeline_profile_artifacts(source, staging_profile)
 
         metadata = {
             "created_at": datetime.now(tz=timezone.utc).isoformat(),
+            "archive_mode": "indexeddb-local-storage",
             "platform": source.platform_name,
             "search_root": str(source.search_root),
             "source_root": str(source.profile_root),

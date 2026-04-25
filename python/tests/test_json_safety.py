@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from teams_ccl_common import clean_text, html_to_text, normalize_json_value, write_json
+from teams_ccl_common import clean_text, html_to_text, normalize_json_value, normalize_thread_id, write_json
 
 
 class _Undefined:
@@ -50,6 +50,9 @@ class JsonSafetyTests(unittest.TestCase):
 
     def test_clean_text_treats_ccl_undefined_as_empty(self) -> None:
         self.assertIsNone(clean_text(_Undefined()))
+
+    def test_normalize_thread_id_strips_wrapping_brackets(self) -> None:
+        self.assertEqual(normalize_thread_id("[19:abc@thread.v2]"), "19:abc@thread.v2")
 
     def test_write_json_normalizes_before_serializing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
