@@ -18,6 +18,7 @@ from teams_ccl_common import (
     decode_output_context,
     html_to_text,
     init_thread_record,
+    is_undefined_value,
     normalize_json_value,
     normalize_thread_id,
     parse_json_object,
@@ -183,6 +184,12 @@ def parse_json_list(value) -> list[dict]:
         if isinstance(parsed, (dict, list)):
             return parse_json_list(parsed)
     return []
+
+
+def safe_dict(value) -> dict:
+    if is_undefined_value(value):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def file_name_from_url(value: str | None) -> str | None:
@@ -1303,7 +1310,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                 replychains_count += 1
                 if replychains_sample is None:
                     replychains_sample = value
-                message_map = value.get("messageMap") or {}
+                message_map = safe_dict(value.get("messageMap"))
                 if message_map:
                     replychains_messages_total += len(message_map)
                     replychains_threads_with_messages += 1

@@ -4,7 +4,25 @@ import argparse
 from pathlib import Path
 
 from dump_teams_indexeddb_ccl import SUMMARY_TARGETS, get_target_stores, load_ccl, resolve_teams_source
-from teams_ccl_common import decode_output_context, write_json
+from teams_ccl_common import decode_output_context, is_undefined_value, write_json
+
+
+def sample_list(value) -> list:
+    return value if isinstance(value, list) else []
+
+
+def sample_dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def sample_preview(value, limit: int = 300) -> str | None:
+    if is_undefined_value(value) or value is None:
+        return None
+    if isinstance(value, (bytes, bytearray)):
+        value = bytes(value).decode("utf-8", "ignore")
+    if not isinstance(value, str):
+        value = str(value)
+    return value[:limit]
 
 
 def build_sample(label: str, sample: dict | None) -> dict | None:
@@ -17,15 +35,16 @@ def build_sample(label: str, sample: dict | None) -> dict | None:
             "ExternalDirectoryObjectId": sample.get("ExternalDirectoryObjectId"),
         }
     if label == "conversations":
+        members = sample_list(sample.get("members"))
         return {
             "id": sample.get("id"),
             "type": sample.get("type"),
             "title": sample.get("title"),
-            "member_count": len(sample.get("members", [])),
+            "member_count": len(members),
         }
     if label == "replychains":
-        message_map = sample.get("messageMap") or {}
-        first_message = next(iter(message_map.values()), {})
+        message_map = sample_dict(sample.get("messageMap"))
+        first_message = sample_dict(next(iter(message_map.values()), {}))
         return {
             "conversationId": sample.get("conversationId"),
             "replyChainId": sample.get("replyChainId"),
@@ -34,17 +53,19 @@ def build_sample(label: str, sample: dict | None) -> dict | None:
                 "id": first_message.get("id"),
                 "imDisplayName": first_message.get("imDisplayName"),
                 "messageType": first_message.get("messageType"),
-                "content_preview": (first_message.get("content") or "")[:300],
+                "content_preview": sample_preview(first_message.get("content")),
             },
         }
     if label == "call_history":
+        originator = sample_dict(sample.get("originatorParticipant"))
+        target = sample_dict(sample.get("targetParticipant"))
         return {
             "id": sample.get("id"),
             "callDirection": sample.get("callDirection"),
             "callType": sample.get("callType"),
             "callState": sample.get("callState"),
-            "originator": (sample.get("originatorParticipant") or {}).get("displayName"),
-            "target": (sample.get("targetParticipant") or {}).get("displayName"),
+            "originator": originator.get("displayName"),
+            "target": target.get("displayName"),
         }
     return sample
 
@@ -60,7 +81,7 @@ def collect_store_stats(store, label: str, show_decode_errors: bool = True) -> t
             if sample is None:
                 sample = value
             if label == "replychains":
-                message_map = value.get("messageMap") or {}
+                message_map = sample_dict(value.get("messageMap"))
                 if message_map:
                     extra_counts["messages_total"] = extra_counts.get("messages_total", 0) + len(message_map)
                     extra_counts["threads_with_messages"] = extra_counts.get("threads_with_messages", 0) + 1
