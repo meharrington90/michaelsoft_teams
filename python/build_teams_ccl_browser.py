@@ -5898,6 +5898,35 @@ HTML_TEMPLATE = """<!doctype html>
       return fallback && !isPlaceholderThreadLabel(fallback) ? fallback : "Target";
     }
 
+    function isDirectCoworkerThread(thread) {
+      if (!thread || thread.category !== "chat_space") return false;
+      const ids = dedupe((thread.participant_ids || []).map(normalizeGuid).filter(Boolean));
+      const names = threadAllParticipantNames(thread);
+      const externalNames = threadExternalParticipantNames(thread);
+      const hasCurrentId = Boolean(CURRENT_USER_ID && ids.includes(CURRENT_USER_ID));
+      const hasCurrentName = Boolean(CURRENT_USER_NAME && names.some(name => normalizeName(name) === CURRENT_USER_NAME));
+      if (externalNames.length === 1) return true;
+      if (hasCurrentId && ids.length === 2) return true;
+      if (hasCurrentName && names.length === 2) return true;
+      return false;
+    }
+
+    function directCoworkerSnapshotLabel(thread, message = null) {
+      const names = threadExternalParticipantNames(thread);
+      if (names.length === 1) return names[0];
+      if (message && !isOwnMessage(message)) {
+        return cleanCallParticipantName(message.sender_display_name || "") || "Originator";
+      }
+      const fallback = threadDisplayLabel(thread);
+      return fallback && !isPlaceholderThreadLabel(fallback) ? fallback : "Coworker";
+    }
+
+    function groupChatSnapshotLabel(thread) {
+      const label = threadDisplayLabel(thread);
+      if (label && !isPlaceholderThreadLabel(label)) return label;
+      return prettyCategory(thread && thread.category) || "Group or Meeting Chat";
+    }
+
     function durationBetweenValues(startValue, endValue) {
       const start = timeValue(startValue);
       const end = timeValue(endValue);
@@ -6249,49 +6278,73 @@ HTML_TEMPLATE = """<!doctype html>
       return best;
     }
 
-    function groupedMessageCounterpartMetrics(dayMessages, responses) {
-      const groups = new Map();
-      const ensure = label => {
+    function createMessageSnapshotGroup(label, kind, thread = null) {
+      return {
+        label,
+        kind,
+        contextType: thread ? prettyCategory(thread.category) : "",
+        sent: 0,
+        received: 0,
+        userResponseSeconds: [],
+        counterpartResponseSeconds: [],
+        firstTimestamp: "",
+        firstTime: Number.POSITIVE_INFINITY,
+        firstThread: null,
+        firstMessageId: "",
+        lastTimestamp: "",
+      };
+    }
+
+    function updateMessageSnapshotFirstSeen(group, thread, message) {
+      const currentTime = timeValue(message && message.timestamp);
+      if (!Number.isFinite(currentTime) || currentTime >= group.firstTime) return;
+      group.firstTimestamp = message.timestamp;
+      group.firstTime = currentTime;
+      group.firstThread = thread;
+      group.firstMessageId = message.id || "";
+    }
+
+    function groupedMessageSnapshotMetrics(dayMessages, responses) {
+      const directGroups = new Map();
+      const contextGroups = new Map();
+      const ensureDirect = (thread, message = null) => {
+        const label = directCoworkerSnapshotLabel(thread, message);
         const key = normalizeTextValue(label || "Unknown");
-        if (!groups.has(key)) {
-          groups.set(key, {
-            label: key,
-            sent: 0,
-            received: 0,
-            userResponseSeconds: [],
-            counterpartResponseSeconds: [],
-            firstTimestamp: "",
-            firstTime: Number.POSITIVE_INFINITY,
-            firstThread: null,
-            firstMessageId: "",
-            lastTimestamp: "",
-          });
+        if (!directGroups.has(key)) {
+          directGroups.set(key, createMessageSnapshotGroup(key, "direct"));
         }
-        return groups.get(key);
+        return directGroups.get(key);
+      };
+      const ensureContext = thread => {
+        const label = groupChatSnapshotLabel(thread);
+        const key = String(thread && thread.id || label || "Group or Meeting Chat");
+        if (!contextGroups.has(key)) {
+          contextGroups.set(key, createMessageSnapshotGroup(label, "context", thread));
+        }
+        return contextGroups.get(key);
+      };
+      const ensureForThread = (thread, message = null) => {
+        return isDirectCoworkerThread(thread) ? ensureDirect(thread, message) : ensureContext(thread);
       };
       for (const item of dayMessages) {
-        const label = threadCounterpartyLabel(item.thread, item.message);
-        const group = ensure(label);
+        const group = ensureForThread(item.thread, item.message);
         if (isOwnMessage(item.message)) group.sent += 1;
         else group.received += 1;
-        const currentTime = timeValue(item.message.timestamp);
-        if (Number.isFinite(currentTime) && currentTime < group.firstTime) {
-          group.firstTimestamp = item.message.timestamp;
-          group.firstTime = currentTime;
-          group.firstThread = item.thread;
-          group.firstMessageId = item.message.id || "";
-        }
+        updateMessageSnapshotFirstSeen(group, item.thread, item.message);
         if (!group.lastTimestamp || timeValue(item.message.timestamp) > timeValue(group.lastTimestamp)) {
           group.lastTimestamp = item.message.timestamp;
         }
       }
       for (const pair of responses.userResponses || []) {
-        ensure(pair.counterparty).userResponseSeconds.push(pair.seconds);
+        ensureForThread(pair.thread, pair.previous).userResponseSeconds.push(pair.seconds);
       }
       for (const pair of responses.counterpartResponses || []) {
-        ensure(pair.counterparty).counterpartResponseSeconds.push(pair.seconds);
+        ensureForThread(pair.thread, pair.current).counterpartResponseSeconds.push(pair.seconds);
       }
-      return [...groups.values()].sort(compareActivityGroupsByFirstTimestamp);
+      return {
+        directGroups: [...directGroups.values()].sort(compareActivityGroupsByFirstTimestamp),
+        contextGroups: [...contextGroups.values()].sort(compareActivityGroupsByFirstTimestamp),
+      };
     }
 
     function edgeByTimestamp(items, timestampForItem, pickLatest = false) {
@@ -6407,7 +6460,7 @@ HTML_TEMPLATE = """<!doctype html>
       const longestChat = longestRapidChat(dayThreadMessages);
       const firstSent = sentMessages[0] || null;
       const firstReceived = receivedMessages[0] || null;
-      const messageCounterpartGroups = groupedMessageCounterpartMetrics(dayMessages, responses);
+      const messageSnapshotGroups = groupedMessageSnapshotMetrics(dayMessages, responses);
 
       const acceptedCalls = dayCalls.filter(isAcceptedCommunication);
       const acceptedCallDurations = acceptedCalls.map(acceptedCallDurationSeconds).filter(Number.isFinite);
@@ -6448,7 +6501,8 @@ HTML_TEMPLATE = """<!doctype html>
           counterpartResponseStats,
           firstSent,
           firstReceived,
-          counterpartGroups: messageCounterpartGroups,
+          counterpartGroups: messageSnapshotGroups.directGroups,
+          contextGroups: messageSnapshotGroups.contextGroups,
         },
         calls: {
           total: dayCalls.length,
@@ -6777,6 +6831,14 @@ HTML_TEMPLATE = """<!doctype html>
         activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "User average response", formatDurationPrecise(userStats.average));
         activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "Their average response", formatDurationPrecise(counterpartStats.average));
       }
+      for (const group of messageStats.contextGroups || []) {
+        const userStats = secondsStats(group.userResponseSeconds);
+        activityCsvPush(rows, dateKey, "Group/Meeting Chat Snapshot", group.label, "Type", group.contextType || "Group or Meeting Chat");
+        activityCsvPush(rows, dateKey, "Group/Meeting Chat Snapshot", group.label, "Sent", group.sent);
+        activityCsvPush(rows, dateKey, "Group/Meeting Chat Snapshot", group.label, "Received", group.received);
+        activityCsvPush(rows, dateKey, "Group/Meeting Chat Snapshot", group.label, "First timestamp", fmt(group.firstTimestamp));
+        activityCsvPush(rows, dateKey, "Group/Meeting Chat Snapshot", group.label, "User average response", formatDurationPrecise(userStats.average));
+      }
 
       activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Calls total", metrics.calls.total);
       activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Calls received", metrics.calls.received);
@@ -7040,8 +7102,34 @@ HTML_TEMPLATE = """<!doctype html>
                     { label: "Their avg response", value: formatDurationPrecise(counterpartStats.average) },
                   ];
                 },
-                "No chat counterpart activity was found for this day.",
+                "No direct coworker chat activity was found for this day.",
                 {
+                  targetForGroup: group => group.firstThread ? ({
+                    kind: "message",
+                    threadId: group.firstThread.id,
+                    focusMessageId: group.firstMessageId || "",
+                    focusTimestamp: group.firstTimestamp || "",
+                    dateKey: localDateKey(group.firstTimestamp) || metrics.dateKey,
+                  }) : null,
+                }
+              )}
+              <div class="section-divider">
+                <div class="section-label">Group/Meeting Chat Snapshot</div>
+              </div>
+              ${renderActivityTargetCards(
+                metrics.messages.contextGroups || [],
+                group => {
+                  const userStats = secondsStats(group.userResponseSeconds);
+                  return [
+                    { label: "Type", value: group.contextType || "Group or Meeting Chat" },
+                    { label: "Sent", value: NUMBER_FORMATTER.format(group.sent) },
+                    { label: "Received", value: NUMBER_FORMATTER.format(group.received) },
+                    { label: "User avg response", value: formatDurationPrecise(userStats.average) },
+                  ];
+                },
+                "No group or meeting chat activity was found for this day.",
+                {
+                  timestampForGroup: group => fmt(group.firstTimestamp),
                   targetForGroup: group => group.firstThread ? ({
                     kind: "message",
                     threadId: group.firstThread.id,
