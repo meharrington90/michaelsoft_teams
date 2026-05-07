@@ -14,11 +14,13 @@ from teams_ccl_common import (
     GUID_RE,
     classify_thread,
     clean_text,
+    count_reactions,
     decode_output_context,
     html_to_text,
     init_thread_record,
     normalize_json_value,
     normalize_thread_id,
+    parse_json_object,
     parse_profile,
     write_json,
 )
@@ -181,19 +183,6 @@ def parse_json_list(value) -> list[dict]:
         if isinstance(parsed, (dict, list)):
             return parse_json_list(parsed)
     return []
-
-
-def parse_json_object(value) -> dict | None:
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return None
-        if isinstance(parsed, dict):
-            return parsed
-    return None
 
 
 def file_name_from_url(value: str | None) -> str | None:
@@ -514,14 +503,7 @@ def extract_message_reactions(raw: dict, guid_to_name: dict[str, str]) -> list[d
 
 
 def reaction_total(reactions: list[dict] | None) -> int:
-    total = 0
-    for reaction in reactions or []:
-        try:
-            count = int(reaction.get("count") or 0)
-        except (TypeError, ValueError):
-            count = 0
-        total += max(count, len(reaction.get("users") or []))
-    return total
+    return count_reactions(reactions)
 
 
 def merge_reaction_lists(*reaction_lists: list[dict] | None) -> list[dict]:
@@ -680,19 +662,6 @@ def merge_thread_participant(thread: dict, participant_id: str | None = None, pa
         thread["participant_ids"].append(normalized_id)
     if cleaned_name and cleaned_name not in thread["participants"]:
         thread["participants"].append(cleaned_name)
-
-
-def parse_embedded_json(value):
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return None
-        if isinstance(parsed, dict):
-            return parsed
-    return None
 
 
 def to_iso_from_datetime_text(value: str | None) -> str | None:
@@ -1293,7 +1262,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                     for source, dest in mapping.items():
                         if source in thread_properties:
                             metadata[dest] = thread_properties[source]
-                    meeting = parse_embedded_json(thread_properties.get("meeting"))
+                    meeting = parse_json_object(thread_properties.get("meeting"))
                     if isinstance(meeting, dict):
                         thread["meeting"] = {
                             "subject": meeting.get("subject"),
@@ -1357,7 +1326,7 @@ def build_export(root: Path | str | None = None, show_decode_errors: bool = True
                         content_text = safe_text(content_string if content_string is not None else content)
                         message_id = safe_text(raw.get("id") or raw.get("clientMessageId") or raw.get("searchKey"))
                         properties = raw.get("properties") or {}
-                        call_log = parse_embedded_json(properties.get("call-log")) if isinstance(properties, dict) else None
+                        call_log = parse_json_object(properties.get("call-log")) if isinstance(properties, dict) else None
 
                         originator = (call_log or {}).get("originatorParticipant") or {}
                         target = (call_log or {}).get("targetParticipant") or {}

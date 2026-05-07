@@ -5,11 +5,11 @@ import csv
 import json
 from pathlib import Path
 
-from teams_ccl_common import ensure_dir, thread_csv_filename
+from teams_ccl_common import count_reactions, ensure_dir, read_json, thread_csv_filename
 
 
 def load_export(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_json(path)
 
 
 def sort_key(message: dict) -> tuple[bool, str, str]:
@@ -25,14 +25,7 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict]) -> None:
 
 
 def reaction_count(reactions: list[dict] | None) -> int:
-    total = 0
-    for reaction in reactions or []:
-        try:
-            count = int(reaction.get("count") or 0)
-        except (TypeError, ValueError):
-            count = 0
-        total += max(count, len(reaction.get("users") or []))
-    return total
+    return count_reactions(reactions)
 
 
 def reaction_summary(reactions: list[dict] | None) -> str:

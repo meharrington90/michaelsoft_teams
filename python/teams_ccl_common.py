@@ -34,6 +34,10 @@ def read_text(path: Path) -> str:
     return path.read_bytes().decode("utf-8", "ignore")
 
 
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def is_undefined_value(value: Any) -> bool:
     if isinstance(value, str):
         return value == "<Undefined>"
@@ -132,6 +136,30 @@ def write_json(path: Path, payload: Any, *, pretty: bool = True) -> None:
     else:
         kwargs["separators"] = (",", ":")
     path.write_text(json.dumps(normalize_json_value(payload), **kwargs), encoding="utf-8")
+
+
+def parse_json_object(value: Any) -> dict | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def count_reactions(reactions: list[dict] | None) -> int:
+    total = 0
+    for reaction in reactions or []:
+        try:
+            count = int(reaction.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        total += max(count, len(reaction.get("users") or []))
+    return total
 
 
 @contextmanager

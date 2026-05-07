@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from teams_ccl_common import thread_csv_filename
+from teams_ccl_common import read_json, thread_csv_filename
 
 
 def thread_csv_path(thread: dict) -> str:
@@ -507,6 +507,17 @@ HTML_TEMPLATE = """<!doctype html>
       border-color: rgba(100,116,139,.18);
       color: #64748b;
     }
+    .calendar-day.no-data {
+      cursor: default;
+      opacity: .30;
+    }
+    .calendar-day.no-data:hover,
+    .calendar-day.no-data:focus-visible {
+      transform: none;
+      border-color: rgba(88,110,147,.13);
+      background: rgba(255,255,255,.78);
+      box-shadow: none;
+    }
     .calendar-day.off-workday.active,
     .calendar-day.inactive-workday.active {
       border-color: rgba(37,99,235,.32);
@@ -547,6 +558,11 @@ HTML_TEMPLATE = """<!doctype html>
     .calendar-activity-dot.high {
       background: #2563EB;
       box-shadow: 0 0 0 2px rgba(37,99,235,.16);
+    }
+    .calendar-activity-empty {
+      width: 7px;
+      height: 7px;
+      display: block;
     }
     .activity-sidebar-summary {
       display: grid;
@@ -2224,9 +2240,14 @@ HTML_TEMPLATE = """<!doctype html>
     const LINKED_CALL_BY_MESSAGE_CACHE = new WeakMap();
     const MESSAGE_HIDDEN_META_CACHE = new WeakMap();
     const MESSAGE_SEARCH_TEXT_CACHE = new WeakMap();
+    const SORTED_CHAT_MESSAGES_ASC_CACHE = new WeakMap();
     const SEARCH_GROUPS_CACHE = new Map();
     const ACTIVITY_COUNTS_BY_DAY_CACHE = { signature: "", value: null };
     const ACTIVITY_DAY_METRICS_CACHE = new Map();
+    const ACTIVITY_INTENSITY_SCORES_CACHE = { signature: "", value: null };
+    const DATASET_DATE_KEYS_CACHE = { keys: null, keySet: null };
+    const MESSAGE_LIST_RENDER_CACHE = { signature: "", countLabel: "" };
+    const CALL_LIST_RENDER_CACHE = { signature: "", countLabel: "" };
     for (const call of DATA.calls || []) {
       rememberPerson(call.originator_id, call.originator_display_name);
       rememberPerson(call.target_id, call.target_display_name);
@@ -3159,7 +3180,10 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
-    function datasetDayCount() {
+    function datasetDateKeys() {
+      if (DATASET_DATE_KEYS_CACHE.keys) {
+        return DATASET_DATE_KEYS_CACHE.keys;
+      }
       const days = new Set();
       for (const thread of DATA.threads || []) {
         for (const message of thread.messages || []) {
@@ -3185,7 +3209,60 @@ HTML_TEMPLATE = """<!doctype html>
           if (key) days.add(key);
         }
       }
-      return days.size;
+      DATASET_DATE_KEYS_CACHE.keys = [...days].sort();
+      DATASET_DATE_KEYS_CACHE.keySet = new Set(DATASET_DATE_KEYS_CACHE.keys);
+      return DATASET_DATE_KEYS_CACHE.keys;
+    }
+
+    function datasetDateKeySet() {
+      datasetDateKeys();
+      return DATASET_DATE_KEYS_CACHE.keySet || new Set();
+    }
+
+    function isDatasetDateKey(dateKey) {
+      return datasetDateKeySet().has(String(dateKey || ""));
+    }
+
+    function datasetDateBounds() {
+      const keys = datasetDateKeys();
+      return {
+        first: keys[0] || "",
+        last: keys[keys.length - 1] || "",
+      };
+    }
+
+    function nearestDatasetDateKey(dateKey) {
+      const keys = datasetDateKeys();
+      if (!keys.length) return "";
+      const normalized = String(dateKey || "");
+      if (isDatasetDateKey(normalized)) return normalized;
+      const { first, last } = datasetDateBounds();
+      if (!normalized || normalized <= first) return first;
+      if (normalized >= last) return last;
+      for (const key of keys) {
+        if (key >= normalized) return key;
+      }
+      return last;
+    }
+
+    function adjacentDatasetDateKey(dateKey, direction) {
+      const keys = datasetDateKeys();
+      if (!keys.length) return "";
+      const normalized = String(dateKey || "");
+      if (direction < 0) {
+        for (let index = keys.length - 1; index >= 0; index -= 1) {
+          if (keys[index] < normalized) return keys[index];
+        }
+        return isDatasetDateKey(normalized) ? normalized : keys[0];
+      }
+      for (const key of keys) {
+        if (key > normalized) return key;
+      }
+      return isDatasetDateKey(normalized) ? normalized : keys[keys.length - 1];
+    }
+
+    function datasetDayCount() {
+      return datasetDateKeys().length;
     }
 
     function pad2(value) {
@@ -3231,28 +3308,6 @@ HTML_TEMPLATE = """<!doctype html>
       const parsed = parseMonthKey(monthKey);
       if (!parsed) return "";
       return `${parsed.year}-${pad2(parsed.month)}-${pad2(day)}`;
-    }
-
-    function shiftDateKey(dateKey, offsetDays) {
-      const parsed = String(dateKey || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
-      const base = parsed
-        ? new Date(Number.parseInt(parsed[1], 10), Number.parseInt(parsed[2], 10) - 1, Number.parseInt(parsed[3], 10))
-        : new Date();
-      base.setDate(base.getDate() + offsetDays);
-      return localDateKeyFromDate(base);
-    }
-
-    function selectedDayRange(dateKey = state.activityDate) {
-      const start = dateBoundaryValue(dateKey, false);
-      const end = dateBoundaryValue(dateKey, true);
-      return { start, end };
-    }
-
-    function valueFallsOnDate(value, dateKey = state.activityDate) {
-      const { start, end } = selectedDayRange(dateKey);
-      if (start === null || end === null) return false;
-      const current = timeValue(value);
-      return Number.isFinite(current) && current >= start && current <= end;
     }
 
     function normalizeTimeInput(value, fallback) {
@@ -3317,13 +3372,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function valueFallsInActivityWindow(value, dateKey = state.activityDate) {
-      const { start, end } = activityResponseWindow(dateKey);
-      if (start === null || end === null) return false;
-      const current = timeValue(value);
-      return Number.isFinite(current) && current >= start && current <= end;
-    }
-
-    function valueFallsInActivityResponseWindow(value, dateKey = state.activityDate) {
+      if (!isConfiguredWorkday(dateKey)) return false;
       const { start, end } = activityResponseWindow(dateKey);
       if (start === null || end === null) return false;
       const current = timeValue(value);
@@ -3331,6 +3380,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function callOverlapsActivityWindow(call, dateKey) {
+      if (!isConfiguredWorkday(dateKey)) return false;
       const { start, end } = activityResponseWindow(dateKey);
       if (start === null || end === null) return false;
       const callStart = timeValue(callActivityStartTimestamp(call));
@@ -3349,6 +3399,8 @@ HTML_TEMPLATE = """<!doctype html>
       ACTIVITY_COUNTS_BY_DAY_CACHE.signature = "";
       ACTIVITY_COUNTS_BY_DAY_CACHE.value = null;
       ACTIVITY_DAY_METRICS_CACHE.clear();
+      ACTIVITY_INTENSITY_SCORES_CACHE.signature = "";
+      ACTIVITY_INTENSITY_SCORES_CACHE.value = null;
     }
 
     function formatActivityClockTime(value) {
@@ -3781,7 +3833,10 @@ HTML_TEMPLATE = """<!doctype html>
       }
 
       if (state.view === "activity") {
-        selectActivityDate(shiftDateKey(state.activityDate || todayDateKey(), direction));
+        const nextDate = adjacentDatasetDateKey(state.activityDate || todayDateKey(), direction);
+        if (nextDate && nextDate !== state.activityDate) {
+          selectActivityDate(nextDate);
+        }
         return;
       }
 
@@ -4145,6 +4200,16 @@ HTML_TEMPLATE = """<!doctype html>
           if (timeDiff !== 0) return timeDiff;
           return (left.label || left.id || "").localeCompare(right.label || right.id || "");
         });
+    }
+
+    function messageListRenderSignature() {
+      return JSON.stringify([
+        state.messageSearch || "",
+        state.category || "",
+        state.messageDateFrom || "",
+        state.messageDateTo || "",
+        state.threadId || "",
+      ]);
     }
 
     function callKey(call) {
@@ -5777,6 +5842,17 @@ HTML_TEMPLATE = """<!doctype html>
         .sort((left, right) => callPrimaryTimestampValue(right) - callPrimaryTimestampValue(left));
     }
 
+    function callListRenderSignature() {
+      return JSON.stringify([
+        state.callSearch || "",
+        state.callGroup || "",
+        state.callDirection || "",
+        state.callDateFrom || "",
+        state.callDateTo || "",
+        state.callKey || "",
+      ]);
+    }
+
     function isCurrentUserIdentity(id, name) {
       const guid = normalizeGuid(id || "");
       const normalizedName = normalizeName(name || "");
@@ -5796,7 +5872,11 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function sortedChatMessagesAsc(thread) {
-      return (thread.messages || [])
+      if (!thread || typeof thread !== "object") return [];
+      if (SORTED_CHAT_MESSAGES_ASC_CACHE.has(thread)) {
+        return SORTED_CHAT_MESSAGES_ASC_CACHE.get(thread);
+      }
+      const messages = (thread.messages || [])
         .filter(isDiagnosticChatMessage)
         .slice()
         .sort((left, right) => {
@@ -5804,6 +5884,8 @@ HTML_TEMPLATE = """<!doctype html>
           if (timeDiff !== 0) return timeDiff;
           return (left.id || "").localeCompare(right.id || "");
         });
+      SORTED_CHAT_MESSAGES_ASC_CACHE.set(thread, messages);
+      return messages;
     }
 
     function threadCounterpartyLabel(thread, message = null) {
@@ -5890,17 +5972,6 @@ HTML_TEMPLATE = """<!doctype html>
 
     function callActivityEndTimestamp(call) {
       return call.end_time || call.meeting_end_time || call.connect_time || call.start_time || "";
-    }
-
-    function callOverlapsDate(call, dateKey) {
-      const { start, end } = selectedDayRange(dateKey);
-      if (start === null || end === null) return false;
-      const callStart = timeValue(callActivityStartTimestamp(call));
-      const callEnd = timeValue(callActivityEndTimestamp(call));
-      if (!Number.isFinite(callStart) && !Number.isFinite(callEnd)) return false;
-      const boundedStart = Number.isFinite(callStart) ? callStart : callEnd;
-      const boundedEnd = Number.isFinite(callEnd) ? callEnd : callStart;
-      return boundedStart <= end && boundedEnd >= start;
     }
 
     function isDeclinedCommunication(call) {
@@ -6049,13 +6120,15 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function latestActivityDate() {
-      const keys = [...activityCountsByDay().keys()].sort();
-      return keys[keys.length - 1] || "";
+      return datasetDateBounds().last || "";
     }
 
     function ensureActivityDate() {
       if (!String(state.activityDate || "").match(/^\\d{4}-\\d{2}-\\d{2}$/)) {
         state.activityDate = latestActivityDate() || todayDateKey();
+      }
+      if (!isDatasetDateKey(state.activityDate)) {
+        state.activityDate = nearestDatasetDateKey(state.activityDate) || todayDateKey();
       }
       if (!parseMonthKey(state.activityMonth)) {
         state.activityMonth = monthKeyFromDateKey(state.activityDate) || monthKeyFromDateKey(todayDateKey());
@@ -6067,6 +6140,10 @@ HTML_TEMPLATE = """<!doctype html>
 
     function selectActivityDate(dateKey) {
       const normalized = String(dateKey || "").match(/^\\d{4}-\\d{2}-\\d{2}$/) ? dateKey : todayDateKey();
+      if (!isDatasetDateKey(normalized)) {
+        showToast("No recovered data for that day");
+        return false;
+      }
       state.activityDate = normalized;
       state.activityMonth = monthKeyFromDateKey(normalized);
       state.focusMessageId = null;
@@ -6074,19 +6151,27 @@ HTML_TEMPLATE = """<!doctype html>
       state.focusTimestamp = null;
       state.focusSearchQuery = "";
       renderView();
+      return true;
+    }
+
+    function defaultActivityDateToLatest() {
+      const latest = latestActivityDate();
+      if (!latest) return;
+      state.activityDate = latest;
+      state.activityMonth = monthKeyFromDateKey(latest);
     }
 
     function activityResponsePairs(dateKey) {
       const userResponses = [];
       const counterpartResponses = [];
+      if (!isConfiguredWorkday(dateKey)) return { userResponses, counterpartResponses };
       for (const thread of DATA.threads || []) {
         const messages = sortedChatMessagesAsc(thread)
-          .filter(message => valueFallsInActivityResponseWindow(message.timestamp, dateKey));
+          .filter(message => valueFallsInActivityWindow(message.timestamp, dateKey));
         let pending = null;
         for (let index = 0; index < messages.length; index += 1) {
           const current = messages[index];
           const currentIsOwn = isOwnMessage(current);
-          if (!valueFallsInActivityResponseWindow(current.timestamp, dateKey)) continue;
           if (!pending) {
             pending = current;
             continue;
@@ -6096,10 +6181,6 @@ HTML_TEMPLATE = """<!doctype html>
             continue;
           }
           const previous = pending;
-          if (!valueFallsInActivityResponseWindow(previous.timestamp, dateKey)) {
-            pending = current;
-            continue;
-          }
           const delta = (timeValue(current.timestamp) - timeValue(previous.timestamp)) / 1000;
           if (!Number.isFinite(delta) || delta < 0) continue;
           if (currentIsOwn) {
@@ -6213,9 +6294,27 @@ HTML_TEMPLATE = """<!doctype html>
       return [...groups.values()].sort(compareActivityGroupsByFirstTimestamp);
     }
 
+    function edgeByTimestamp(items, timestampForItem, pickLatest = false) {
+      let best = null;
+      let bestTime = pickLatest ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+      for (const item of items || []) {
+        const current = timeValue(timestampForItem(item));
+        if (!Number.isFinite(current)) continue;
+        if (
+          (!pickLatest && current < bestTime) ||
+          (pickLatest && current > bestTime)
+        ) {
+          best = item;
+          bestTime = current;
+        }
+      }
+      return best;
+    }
+
     function buildActivityDayMetrics(dateKey) {
       const cacheKey = `${dateKey}|${activitySettingsSignature()}`;
       if (ACTIVITY_DAY_METRICS_CACHE.has(cacheKey)) return ACTIVITY_DAY_METRICS_CACHE.get(cacheKey);
+      const responses = activityResponsePairs(dateKey);
       const actions = [];
       const dayMessages = [];
       const dayThreadMessages = [];
@@ -6303,7 +6402,6 @@ HTML_TEMPLATE = """<!doctype html>
       const receivedMessages = dayMessages.filter(item => !isOwnMessage(item.message));
       const endedChats = dayThreadMessages.filter(entry => isOwnMessage(entry.messages[entry.messages.length - 1])).length;
       const ghostedChats = dayThreadMessages.filter(entry => !isOwnMessage(entry.messages[entry.messages.length - 1])).length;
-      const responses = activityResponsePairs(dateKey);
       const userResponseStats = secondsStats(responses.userResponses.map(pair => pair.seconds));
       const counterpartResponseStats = secondsStats(responses.counterpartResponses.map(pair => pair.seconds));
       const longestChat = longestRapidChat(dayThreadMessages);
@@ -6316,8 +6414,8 @@ HTML_TEMPLATE = """<!doctype html>
       const callDurationStats = secondsStats(acceptedCallDurations);
       const inboundCalls = dayCalls.filter(call => displayCallDirection(call) === "incoming");
       const outboundCalls = dayCalls.filter(call => displayCallDirection(call) === "outgoing");
-      const firstOutboundCall = outboundCalls.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)))[0] || null;
-      const firstInboundCall = inboundCalls.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)))[0] || null;
+      const firstOutboundCall = edgeByTimestamp(outboundCalls, callActivityStartTimestamp);
+      const firstInboundCall = edgeByTimestamp(inboundCalls, callActivityStartTimestamp);
       const inboundCallGroups = callParticipantMetricGroups(inboundCalls);
       const outboundCallGroups = callParticipantMetricGroups(outboundCalls);
 
@@ -6325,11 +6423,13 @@ HTML_TEMPLATE = """<!doctype html>
       const missedMeetings = dayMeetings.filter(isMissedMeeting);
       const meetingDurations = attendedMeetings.map(meetingDurationSeconds).filter(Number.isFinite);
       const meetingDurationStats = secondsStats(meetingDurations);
-      const meetingsByTime = dayMeetings.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)));
+      const firstMeeting = edgeByTimestamp(dayMeetings, callActivityStartTimestamp);
+      const lastMeeting = edgeByTimestamp(dayMeetings, callActivityStartTimestamp, true);
 
       const metrics = {
         dateKey,
         workWindowLabel: activityWorkWindowLabel(),
+        responses,
         actions,
         firstAction: actions[0] || null,
         lastAction: actions[actions.length - 1] || null,
@@ -6368,8 +6468,8 @@ HTML_TEMPLATE = """<!doctype html>
           missed: missedMeetings.length,
           totalDurationSeconds: meetingDurations.reduce((sum, value) => sum + value, 0),
           durationStats: meetingDurationStats,
-          first: meetingsByTime[0] || null,
-          last: meetingsByTime[meetingsByTime.length - 1] || null,
+          first: firstMeeting,
+          last: lastMeeting,
         },
       };
       ACTIVITY_DAY_METRICS_CACHE.set(cacheKey, metrics);
@@ -6736,10 +6836,15 @@ HTML_TEMPLATE = """<!doctype html>
 
     function activityIntensityForScore(score) {
       if (!Number.isFinite(score) || score <= 0) return "none";
-      const scores = [...activityCountsByDay().values()]
-        .map(record => record.selfActivity || 0)
-        .filter(value => value > 0)
-        .sort((left, right) => left - right);
+      const signature = activitySettingsSignature();
+      if (!ACTIVITY_INTENSITY_SCORES_CACHE.value || ACTIVITY_INTENSITY_SCORES_CACHE.signature !== signature) {
+        ACTIVITY_INTENSITY_SCORES_CACHE.signature = signature;
+        ACTIVITY_INTENSITY_SCORES_CACHE.value = [...activityCountsByDay().values()]
+          .map(record => record.selfActivity || 0)
+          .filter(value => value > 0)
+          .sort((left, right) => left - right);
+      }
+      const scores = ACTIVITY_INTENSITY_SCORES_CACHE.value;
       if (!scores.length) return "none";
       if (scores[0] === scores[scores.length - 1]) return "average";
       if (score >= quantile(scores, .75)) return "high";
@@ -6760,10 +6865,10 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function bestActivityDateForMonth(monthKey) {
-      const keys = [...activityCountsByDay().keys()]
+      const keys = datasetDateKeys()
         .filter(key => monthKeyFromDateKey(key) === monthKey)
         .sort();
-      return keys[0] || dateKeyInMonth(monthKey, 1) || todayDateKey();
+      return keys[0] || nearestDatasetDateKey(dateKeyInMonth(monthKey, 1)) || todayDateKey();
     }
 
     function renderActivityCalendar() {
@@ -6785,18 +6890,26 @@ HTML_TEMPLATE = """<!doctype html>
         const selfActivity = record.selfActivity || 0;
         const intensity = activityIntensityForScore(selfActivity);
         const workday = isConfiguredWorkday(dateKey);
+        const datasetDay = isDatasetDateKey(dateKey);
         const classes = [
           "calendar-day",
           cellDate.getMonth() === parsed.month - 1 ? "" : "outside",
+          datasetDay ? "" : "no-data",
           workday ? "" : "off-workday",
           workday && selfActivity <= 0 ? "inactive-workday" : "",
-          dateKey === state.activityDate ? "active" : "",
+          datasetDay && dateKey === state.activityDate ? "active" : "",
           dateKey === todayKey ? "today" : "",
         ].filter(Boolean).join(" ");
+        const dotHtml = datasetDay && total
+          ? `<span class="calendar-activity-dot ${escapeHtml(intensity)}"></span>`
+          : `<span class="calendar-activity-empty"></span>`;
+        const ariaLabel = datasetDay
+          ? `${formatDateOnly(dateKey)} | ${activityIntensityLabel(intensity)} | ${selfActivity} self actions | ${total} observed items`
+          : `${formatDateOnly(dateKey)} | No recovered data`;
         cells.push(`
-          <button type="button" class="${escapeHtml(classes)}" data-date="${escapeHtml(dateKey)}" aria-label="${escapeHtml(`${formatDateOnly(dateKey)} | ${activityIntensityLabel(intensity)} | ${selfActivity} self actions | ${total} observed items`)}">
+          <button type="button" class="${escapeHtml(classes)}" data-date="${escapeHtml(dateKey)}" aria-label="${escapeHtml(ariaLabel)}"${datasetDay ? "" : " disabled"}>
             <span class="calendar-date-num">${escapeHtml(String(cellDate.getDate()))}</span>
-            <span class="calendar-activity-dot ${escapeHtml(intensity)}"></span>
+            ${dotHtml}
             <span class="calendar-count">${total ? escapeHtml(NUMBER_FORMATTER.format(total)) : ""}</span>
           </button>
         `);
@@ -6829,6 +6942,7 @@ HTML_TEMPLATE = """<!doctype html>
       `;
       for (const day of activityList.querySelectorAll(".calendar-day[data-date]")) {
         day.addEventListener("click", () => {
+          if (day.disabled) return;
           selectActivityDate(day.dataset.date);
         });
       }
@@ -6837,7 +6951,7 @@ HTML_TEMPLATE = """<!doctype html>
     function renderActivityPanel() {
       ensureActivityDate();
       const metrics = buildActivityDayMetrics(state.activityDate);
-      const responses = activityResponsePairs(state.activityDate);
+      const responses = metrics.responses || { userResponses: [], counterpartResponses: [] };
       const firstSentStats = metrics.messages.firstSent
         ? threadResponseStatsFor(responses.counterpartResponses, metrics.messages.firstSent.thread)
         : secondsStats([]);
@@ -7380,6 +7494,11 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function renderMessageList() {
+      const initialSignature = messageListRenderSignature();
+      if (MESSAGE_LIST_RENDER_CACHE.signature === initialSignature) {
+        sidebarCount.textContent = MESSAGE_LIST_RENDER_CACHE.countLabel;
+        return;
+      }
       const rows = filteredThreads();
       sidebarCount.textContent = `${rows.length} conversations`;
       if (!state.threadId || !rows.some(thread => thread.id === state.threadId)) {
@@ -7399,9 +7518,16 @@ HTML_TEMPLATE = """<!doctype html>
           </div>
         </div>
       `).join("") || `<div class="empty">No conversations match the current filters.</div>`;
+      MESSAGE_LIST_RENDER_CACHE.signature = messageListRenderSignature();
+      MESSAGE_LIST_RENDER_CACHE.countLabel = sidebarCount.textContent;
     }
 
     function renderCallList() {
+      const initialSignature = callListRenderSignature();
+      if (CALL_LIST_RENDER_CACHE.signature === initialSignature) {
+        sidebarCount.textContent = CALL_LIST_RENDER_CACHE.countLabel;
+        return;
+      }
       const rows = filteredCalls();
       sidebarCount.textContent = `${rows.length} calls`;
       if (!state.callKey || !rows.some(call => callKey(call) === state.callKey)) {
@@ -7420,6 +7546,8 @@ HTML_TEMPLATE = """<!doctype html>
           </div>
         </div>
       `).join("") || `<div class="empty">No calls match the current filters.</div>`;
+      CALL_LIST_RENDER_CACHE.signature = callListRenderSignature();
+      CALL_LIST_RENDER_CACHE.countLabel = sidebarCount.textContent;
     }
 
     function renderSearchLoadingPanel() {
@@ -8042,8 +8170,9 @@ HTML_TEMPLATE = """<!doctype html>
 
     if (activityToday) {
       activityToday.addEventListener("click", () => {
-        selectActivityDate(todayDateKey());
-        scrollAllToTop();
+        if (selectActivityDate(todayDateKey())) {
+          scrollAllToTop();
+        }
       });
     }
 
@@ -8090,7 +8219,7 @@ HTML_TEMPLATE = """<!doctype html>
         state.callDateTo = "";
       }
       if (filterKey === "activity-date") {
-        selectActivityDate(todayDateKey());
+        selectActivityDate(latestActivityDate() || todayDateKey());
         return;
       }
       if (filterKey === "activity-window") {
@@ -8208,6 +8337,9 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     restoreState();
+    if (state.view === "activity") {
+      defaultActivityDateToLatest();
+    }
     syncInputsFromState();
     renderChrome();
     scheduleSyncScrollTopButtons();
@@ -8223,7 +8355,7 @@ HTML_TEMPLATE = """<!doctype html>
 
 
 def load_export(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_json(path)
 
 
 SUMMARY_FIELDS = (
@@ -8242,7 +8374,6 @@ THREAD_FIELDS = (
     "category",
     "label",
     "message_count",
-    "messages",
     "metadata",
     "meeting",
     "participant_ids",
@@ -8257,8 +8388,6 @@ MESSAGE_FIELDS = (
     "sender_id",
     "message_type",
     "content_text",
-    "reactions",
-    "attachments",
     "quality",
 )
 MESSAGE_ATTACHMENT_FIELDS = ("id", "name", "url", "preview_url", "kind")
@@ -8285,7 +8414,6 @@ CALL_FIELDS = (
     "originator_phone_number",
     "participant_display_names",
     "participant_ids",
-    "participant_sessions",
     "quality",
     "shared_correlation_id",
     "start_time",
