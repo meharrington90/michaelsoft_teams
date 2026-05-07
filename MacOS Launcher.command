@@ -55,7 +55,6 @@ ensure_runtime || {
   echo
   echo "Runtime creation failed."
   echo
-  read -r -p "Press Enter to close..."
   exit 1
 }
 
@@ -65,12 +64,10 @@ ensure_requirements || {
   echo "This launcher installs ccl_chromium_reader from GitHub source archives."
   echo "Network access to github.com and codeload.github.com is required."
   echo
-  read -r -p "Press Enter to close..."
   exit 1
 }
 
 "$VENV_PY" "$PYTHON_DIR/run_teams_pipeline.py" --open-browser "$@"
 STATUS=$?
 echo
-read -r -p "Press Enter to close..."
 exit $STATUS

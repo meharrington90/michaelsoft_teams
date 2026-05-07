@@ -67,7 +67,7 @@ Both launchers:
 - fall back to a bundled `uv` runtime when Python is not installed
 - install dependencies on first run
 - refresh the repo-local Teams artifact snapshot and run `python/run_teams_pipeline.py --open-browser`
-- pause at the end so you can review any errors instead of watching a terminal window vanish like a witness in a conspiracy movie
+- close automatically after the pipeline exits
 
 After a successful run, the generated browser viewer opens automatically in your default browser.
 

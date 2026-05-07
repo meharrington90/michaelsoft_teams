@@ -258,7 +258,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
     .view-tabs {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
       padding: 3px;
       border-radius: 16px;
@@ -351,6 +351,223 @@ HTML_TEMPLATE = """<!doctype html>
     }
     .toolbar > * {
       min-width: 0;
+    }
+    .activity-month-nav {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) 38px;
+      gap: 6px;
+      align-items: center;
+    }
+    .activity-month-nav .call-link {
+      min-height: 38px;
+      border-radius: 12px;
+      padding: 0;
+      font-size: 15px;
+    }
+    .activity-month-nav input[type="month"] {
+      min-height: 38px;
+    }
+    .activity-work-hours {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+    .activity-workdays {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .workday-toggle {
+      min-width: 0;
+      cursor: pointer;
+    }
+    .workday-toggle input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .workday-toggle span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 5px 2px;
+      border-radius: 10px;
+      border: 1px solid rgba(88,110,147,.14);
+      background: rgba(226,232,240,.76);
+      color: #64748b;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: .04em;
+      transition:
+        background .18s var(--ease),
+        border-color .18s var(--ease),
+        box-shadow .18s var(--ease),
+        color .18s var(--ease);
+    }
+    .workday-toggle input:checked + span {
+      color: var(--accent-strong);
+      background: rgba(232,241,255,.96);
+      border-color: rgba(37,99,235,.22);
+      box-shadow: 0 6px 12px rgba(37,99,235,.08);
+    }
+    .workday-toggle input:focus-visible + span {
+      outline: none;
+      box-shadow:
+        0 0 0 4px rgba(37,99,235,.12),
+        0 6px 12px rgba(37,99,235,.08);
+    }
+    .activity-calendar {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.90), rgba(245,248,255,.76));
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.78),
+        0 8px 18px rgba(15,23,42,.05);
+    }
+    .calendar-heading {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      align-items: center;
+      text-align: center;
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .calendar-weekday {
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .calendar-day {
+      position: relative;
+      display: grid;
+      place-items: center;
+      gap: 1px;
+      width: 100%;
+      min-width: 0;
+      aspect-ratio: 1;
+      padding: 4px 2px;
+      border-radius: 11px;
+      border: 1px solid rgba(88,110,147,.13);
+      background: rgba(255,255,255,.78);
+      color: var(--muted-strong);
+      cursor: pointer;
+      transition:
+        transform .18s var(--ease),
+        border-color .18s var(--ease),
+        background .18s var(--ease),
+        box-shadow .18s var(--ease);
+    }
+    .calendar-day:hover {
+      transform: translateY(-1px);
+      border-color: rgba(37,99,235,.26);
+      background: rgba(255,255,255,.98);
+      box-shadow: 0 8px 14px rgba(37,99,235,.08);
+    }
+    .calendar-day:focus-visible {
+      outline: none;
+      box-shadow:
+        0 0 0 4px rgba(37,99,235,.12),
+        0 8px 14px rgba(37,99,235,.08);
+    }
+    .calendar-day.outside {
+      opacity: .42;
+    }
+    .calendar-day.today {
+      border-color: rgba(15,118,110,.28);
+      color: var(--success);
+    }
+    .calendar-day.active {
+      border-color: rgba(37,99,235,.30);
+      background: linear-gradient(180deg, rgba(232,241,255,.98), rgba(255,255,255,.94));
+      color: var(--accent-strong);
+      box-shadow: 0 10px 18px rgba(37,99,235,.12);
+    }
+    .calendar-day.off-workday,
+    .calendar-day.inactive-workday {
+      background: rgba(226,232,240,.76);
+      border-color: rgba(100,116,139,.18);
+      color: #64748b;
+    }
+    .calendar-day.off-workday.active,
+    .calendar-day.inactive-workday.active {
+      border-color: rgba(37,99,235,.32);
+      background:
+        linear-gradient(180deg, rgba(232,241,255,.72), rgba(226,232,240,.84));
+    }
+    .calendar-date-num {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 800;
+    }
+    .calendar-count {
+      min-height: 11px;
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .calendar-activity-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #111827;
+      box-shadow: 0 0 0 2px rgba(17,24,39,.10);
+    }
+    .calendar-activity-dot.minimal {
+      background: #DC2626;
+      box-shadow: 0 0 0 2px rgba(220,38,38,.14);
+    }
+    .calendar-activity-dot.low {
+      background: #EAB308;
+      box-shadow: 0 0 0 2px rgba(234,179,8,.16);
+    }
+    .calendar-activity-dot.average {
+      background: #16A34A;
+      box-shadow: 0 0 0 2px rgba(22,163,74,.14);
+    }
+    .calendar-activity-dot.high {
+      background: #2563EB;
+      box-shadow: 0 0 0 2px rgba(37,99,235,.16);
+    }
+    .activity-sidebar-summary {
+      display: grid;
+      gap: 5px;
+    }
+    .activity-sidebar-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 7px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(88,110,147,.14);
+      background: rgba(255,255,255,.78);
+      color: var(--muted-strong);
+      font-size: 11px;
+      line-height: 1.18;
+    }
+    .activity-sidebar-stat strong {
+      color: var(--ink);
+      font-size: 12px;
     }
     .chip-row,
     .chips,
@@ -646,6 +863,10 @@ HTML_TEMPLATE = """<!doctype html>
     .threads-card {
       --card-geo: rgba(37,99,235,.16);
       --card-outline: rgba(37,99,235,.12);
+    }
+    .days-card {
+      --card-geo: rgba(99,102,241,.15);
+      --card-outline: rgba(99,102,241,.12);
     }
     .messages-card {
       --card-geo: rgba(14,165,233,.16);
@@ -978,6 +1199,154 @@ HTML_TEMPLATE = """<!doctype html>
       height: 1px;
       flex: 1;
       background: linear-gradient(90deg, transparent, rgba(88,110,147,.18), transparent);
+    }
+    .activity-report {
+      display: grid;
+      gap: 12px;
+    }
+    .activity-report-actions {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .activity-export-panel {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 160px)) auto;
+      gap: 7px;
+      align-items: end;
+      width: 100%;
+      margin-top: 8px;
+      padding: 9px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(88,110,147,.14);
+      background: rgba(255,255,255,.72);
+    }
+    .activity-section {
+      display: grid;
+      gap: 9px;
+      padding: 12px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(88,110,147,.16);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.90), rgba(245,248,255,.76));
+      box-shadow:
+        0 8px 18px rgba(15,23,42,.04),
+        0 0 0 1px rgba(255,255,255,.56) inset;
+    }
+    .activity-section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .activity-section-title {
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .activity-section-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .activity-metric-grid,
+    .activity-record-grid,
+    .activity-target-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .activity-metric-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .activity-record-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .activity-target-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .activity-target-card {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(88,110,147,.15);
+      background: rgba(255,255,255,.82);
+      box-shadow:
+        0 6px 12px rgba(15,23,42,.035),
+        0 0 0 1px rgba(255,255,255,.50) inset;
+    }
+    .activity-target-link {
+      cursor: pointer;
+      transition:
+        transform .18s var(--ease),
+        border-color .18s var(--ease),
+        box-shadow .18s var(--ease),
+        background .18s var(--ease);
+    }
+    .activity-target-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(37,99,235,.28);
+      background: rgba(255,255,255,.96);
+      box-shadow:
+        0 10px 18px rgba(37,99,235,.10),
+        0 0 0 1px rgba(255,255,255,.56) inset;
+    }
+    .activity-target-link:focus-visible {
+      outline: none;
+      box-shadow:
+        0 0 0 4px rgba(37,99,235,.13),
+        0 10px 18px rgba(37,99,235,.10);
+    }
+    .activity-target-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+    }
+    .activity-target-title {
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .activity-target-time {
+      flex: 0 0 auto;
+      max-width: 48%;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      font-weight: 800;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    .activity-target-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .activity-target-stat {
+      padding: 7px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(88,110,147,.12);
+      background: rgba(245,248,255,.84);
+      color: var(--muted-strong);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .activity-target-stat strong {
+      display: block;
+      margin-top: 2px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.2;
     }
     .expandable-shell {
       display: grid;
@@ -1572,7 +1941,11 @@ HTML_TEMPLATE = """<!doctype html>
       .summary,
       .meta-grid,
       .call-event-grid,
-      .stat-strip {
+      .stat-strip,
+      .activity-metric-grid,
+      .activity-record-grid,
+      .activity-target-grid,
+      .activity-export-panel {
         grid-template-columns: 1fr;
       }
       .main {
@@ -1617,6 +1990,7 @@ HTML_TEMPLATE = """<!doctype html>
         <div class="view-tabs">
           <button id="viewMessages" class="tab active" type="button">Messages</button>
           <button id="viewCalls" class="tab" type="button">Calls</button>
+          <button id="viewActivity" class="tab" type="button">Activity</button>
         </div>
         <div id="messagesTools" class="toolbar">
           <input id="messageSearch" type="search" placeholder="Search Conversations and Messages...">
@@ -1666,6 +2040,33 @@ HTML_TEMPLATE = """<!doctype html>
             <button id="clearCallDateRange" type="button" class="call-link range-action">Clear Filters</button>
           </div>
         </div>
+        <div id="activityTools" class="toolbar hidden">
+          <div class="activity-month-nav">
+            <button id="activityPrevMonth" class="call-link" type="button" aria-label="Previous month">&#8249;</button>
+            <input id="activityMonth" type="month" value="">
+            <button id="activityNextMonth" class="call-link" type="button" aria-label="Next month">&#8250;</button>
+          </div>
+          <div class="activity-work-hours">
+            <label class="range-field">
+              <span>Work Start</span>
+              <input id="activityWorkStart" type="time" value="08:00">
+            </label>
+            <label class="range-field">
+              <span>Work End</span>
+              <input id="activityWorkEnd" type="time" value="17:00">
+            </label>
+          </div>
+          <div class="activity-workdays" aria-label="Work days">
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="0"><span>Sun</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="1" checked><span>Mon</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="2" checked><span>Tue</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="3" checked><span>Wed</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="4" checked><span>Thu</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="5" checked><span>Fri</span></label>
+            <label class="workday-toggle"><input class="activity-workday-input" type="checkbox" value="6"><span>Sat</span></label>
+          </div>
+          <button id="activityToday" type="button" class="call-link range-action">Today</button>
+        </div>
         <div class="chip-row">
           <div id="sidebarCount" class="chip chip-strong"></div>
           <div class="chip hotkey-chip">/ Search</div>
@@ -1677,6 +2078,7 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="sidebar-list-wrap">
         <div id="threadList" class="list"></div>
         <div id="callList" class="list hidden"></div>
+        <div id="activityList" class="list hidden"></div>
       </div>
       <button id="sidebarScrollTop" class="scroll-top-button" type="button" aria-label="Scroll sidebar to top" aria-hidden="true">&#8593;</button>
     </aside>
@@ -1691,8 +2093,9 @@ HTML_TEMPLATE = """<!doctype html>
               </div>
             </div>
             <div class="summary">
-              <div class="card threads-card"><div class="label">Threads</div><div class="value" id="sumThreads"></div></div>
-              <div class="card messages-card"><div class="label">Messages</div><div class="value" id="sumMessages"></div></div>
+              <div class="card days-card"><div class="label">Days</div><div class="value" id="sumDays"></div></div>
+              <div class="card threads-card"><div class="label">Messages</div><div class="value" id="sumThreads"></div></div>
+              <div class="card messages-card"><div class="label">Message Items</div><div class="value" id="sumMessages"></div></div>
               <div class="card calls-card"><div class="label">Calls</div><div class="value" id="sumCalls"></div></div>
               <div class="card attachments-card"><div class="label">Attachments</div><div class="value" id="sumAttachments"></div></div>
               <div class="card reactions-card"><div class="label">Reactions</div><div class="value" id="sumReactions"></div></div>
@@ -1719,6 +2122,14 @@ HTML_TEMPLATE = """<!doctype html>
       callDirection: "",
       callDateFrom: "",
       callDateTo: "",
+      activityDate: "",
+      activityMonth: "",
+      activityWorkStart: "08:00",
+      activityWorkEnd: "17:00",
+      activityWorkDays: "1,2,3,4,5",
+      activityExportFrom: "",
+      activityExportTo: "",
+      activityExportOpen: false,
       messageViewFilter: "all",
       threadDateFrom: "",
       threadDateTo: "",
@@ -1738,14 +2149,17 @@ HTML_TEMPLATE = """<!doctype html>
     const sidebarListWrap = document.querySelector(".sidebar-list-wrap");
     const threadList = document.getElementById("threadList");
     const callList = document.getElementById("callList");
+    const activityList = document.getElementById("activityList");
     const messagesTools = document.getElementById("messagesTools");
     const callsTools = document.getElementById("callsTools");
+    const activityTools = document.getElementById("activityTools");
     const activeFilterBar = document.getElementById("activeFilterBar");
     const sidebarCount = document.getElementById("sidebarCount");
     const brandProfile = document.getElementById("brandProfile");
     const overviewMode = document.getElementById("overviewMode");
     const viewMessages = document.getElementById("viewMessages");
     const viewCalls = document.getElementById("viewCalls");
+    const viewActivity = document.getElementById("viewActivity");
     const messageSearch = document.getElementById("messageSearch");
     const categoryFilter = document.getElementById("categoryFilter");
     const messageDateFrom = document.getElementById("messageDateFrom");
@@ -1757,6 +2171,13 @@ HTML_TEMPLATE = """<!doctype html>
     const callDateFrom = document.getElementById("callDateFrom");
     const callDateTo = document.getElementById("callDateTo");
     const clearCallDateRange = document.getElementById("clearCallDateRange");
+    const activityMonth = document.getElementById("activityMonth");
+    const activityPrevMonth = document.getElementById("activityPrevMonth");
+    const activityNextMonth = document.getElementById("activityNextMonth");
+    const activityWorkStart = document.getElementById("activityWorkStart");
+    const activityWorkEnd = document.getElementById("activityWorkEnd");
+    const activityWorkdayInputs = [...document.querySelectorAll(".activity-workday-input")];
+    const activityToday = document.getElementById("activityToday");
     const sidebarScrollTopButton = document.getElementById("sidebarScrollTop");
     const mainScrollTopButton = document.getElementById("mainScrollTop");
     const toast = document.getElementById("toast");
@@ -1804,6 +2225,8 @@ HTML_TEMPLATE = """<!doctype html>
     const MESSAGE_HIDDEN_META_CACHE = new WeakMap();
     const MESSAGE_SEARCH_TEXT_CACHE = new WeakMap();
     const SEARCH_GROUPS_CACHE = new Map();
+    const ACTIVITY_COUNTS_BY_DAY_CACHE = { signature: "", value: null };
+    const ACTIVITY_DAY_METRICS_CACHE = new Map();
     for (const call of DATA.calls || []) {
       rememberPerson(call.originator_id, call.originator_display_name);
       rememberPerson(call.target_id, call.target_display_name);
@@ -1829,6 +2252,7 @@ HTML_TEMPLATE = """<!doctype html>
       if (namePair) addToMapList(CALLS_BY_NAME_PAIR, namePair, call);
     }
 
+    document.getElementById("sumDays").textContent = NUMBER_FORMATTER.format(datasetDayCount());
     document.getElementById("sumThreads").textContent = NUMBER_FORMATTER.format(DATA.summary.threads_total || 0);
     document.getElementById("sumMessages").textContent = NUMBER_FORMATTER.format(DATA.summary.messages_total || 0);
     document.getElementById("sumCalls").textContent = NUMBER_FORMATTER.format(DATA.summary.calls_total || 0);
@@ -2735,6 +3159,215 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
+    function datasetDayCount() {
+      const days = new Set();
+      for (const thread of DATA.threads || []) {
+        for (const message of thread.messages || []) {
+          const key = localDateKey(message.timestamp);
+          if (key) days.add(key);
+          for (const reaction of message.reactions || []) {
+            for (const user of reaction.users || []) {
+              const reactionKey = localDateKey(user && user.reacted_at);
+              if (reactionKey) days.add(reactionKey);
+            }
+          }
+        }
+      }
+      for (const call of DATA.calls || []) {
+        for (const value of [
+          call.start_time,
+          call.connect_time,
+          call.end_time,
+          call.meeting_start_time,
+          call.meeting_end_time,
+        ]) {
+          const key = localDateKey(value);
+          if (key) days.add(key);
+        }
+      }
+      return days.size;
+    }
+
+    function pad2(value) {
+      return String(value).padStart(2, "0");
+    }
+
+    function localDateKeyFromDate(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+      return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    }
+
+    function localDateKey(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      return localDateKeyFromDate(date);
+    }
+
+    function todayDateKey() {
+      return localDateKeyFromDate(new Date());
+    }
+
+    function monthKeyFromDateKey(dateKey) {
+      const match = String(dateKey || "").match(/^(\\d{4})-(\\d{2})/);
+      return match ? `${match[1]}-${match[2]}` : "";
+    }
+
+    function parseMonthKey(monthKey) {
+      const match = String(monthKey || "").match(/^(\\d{4})-(\\d{2})$/);
+      if (!match) return null;
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10);
+      if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+      return { year, month };
+    }
+
+    function shiftMonthKey(monthKey, offset) {
+      const parsed = parseMonthKey(monthKey) || parseMonthKey(monthKeyFromDateKey(todayDateKey()));
+      const date = new Date(parsed.year, parsed.month - 1 + offset, 1);
+      return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+    }
+
+    function dateKeyInMonth(monthKey, day) {
+      const parsed = parseMonthKey(monthKey);
+      if (!parsed) return "";
+      return `${parsed.year}-${pad2(parsed.month)}-${pad2(day)}`;
+    }
+
+    function shiftDateKey(dateKey, offsetDays) {
+      const parsed = String(dateKey || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+      const base = parsed
+        ? new Date(Number.parseInt(parsed[1], 10), Number.parseInt(parsed[2], 10) - 1, Number.parseInt(parsed[3], 10))
+        : new Date();
+      base.setDate(base.getDate() + offsetDays);
+      return localDateKeyFromDate(base);
+    }
+
+    function selectedDayRange(dateKey = state.activityDate) {
+      const start = dateBoundaryValue(dateKey, false);
+      const end = dateBoundaryValue(dateKey, true);
+      return { start, end };
+    }
+
+    function valueFallsOnDate(value, dateKey = state.activityDate) {
+      const { start, end } = selectedDayRange(dateKey);
+      if (start === null || end === null) return false;
+      const current = timeValue(value);
+      return Number.isFinite(current) && current >= start && current <= end;
+    }
+
+    function normalizeTimeInput(value, fallback) {
+      const text = String(value || "").trim();
+      return /^\\d{2}:\\d{2}$/.test(text) ? text : fallback;
+    }
+
+    function normalizedWorkStart() {
+      return normalizeTimeInput(state.activityWorkStart, "08:00");
+    }
+
+    function normalizedWorkEnd() {
+      return normalizeTimeInput(state.activityWorkEnd, "17:00");
+    }
+
+    function normalizedWorkDaysValue() {
+      const seen = new Set();
+      for (const value of String(state.activityWorkDays || "").split(",")) {
+        const day = Number.parseInt(value, 10);
+        if (Number.isInteger(day) && day >= 0 && day <= 6) seen.add(String(day));
+      }
+      return [...seen].sort((left, right) => Number(left) - Number(right)).join(",");
+    }
+
+    function configuredWorkdaySet() {
+      return new Set(normalizedWorkDaysValue().split(",").filter(value => value !== ""));
+    }
+
+    function isConfiguredWorkday(dateKey) {
+      const match = String(dateKey || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+      if (!match) return false;
+      const date = new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
+      return configuredWorkdaySet().has(String(date.getDay()));
+    }
+
+    function minutesFromTimeString(value) {
+      const [hours, minutes] = normalizeTimeInput(value, "00:00").split(":").map(part => Number.parseInt(part, 10));
+      return (hours * 60) + minutes;
+    }
+
+    function activityWorkWindow(dateKey) {
+      const match = String(dateKey || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+      if (!match) return { start: null, end: null };
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10) - 1;
+      const day = Number.parseInt(match[3], 10);
+      const startMinutes = minutesFromTimeString(normalizedWorkStart());
+      const endMinutes = minutesFromTimeString(normalizedWorkEnd());
+      const start = new Date(year, month, day, Math.floor(startMinutes / 60), startMinutes % 60, 0, 0).getTime();
+      const endDate = new Date(year, month, day, Math.floor(endMinutes / 60), endMinutes % 60, 59, 999);
+      if (endMinutes <= startMinutes) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      return { start, end: endDate.getTime() };
+    }
+
+    function activityResponseWindow(dateKey) {
+      const { start, end } = activityWorkWindow(dateKey);
+      if (start === null || end === null) return { start: null, end: null };
+      const buffer = 2 * 60 * 60 * 1000;
+      return { start: start - buffer, end: end + buffer };
+    }
+
+    function valueFallsInActivityWindow(value, dateKey = state.activityDate) {
+      const { start, end } = activityResponseWindow(dateKey);
+      if (start === null || end === null) return false;
+      const current = timeValue(value);
+      return Number.isFinite(current) && current >= start && current <= end;
+    }
+
+    function valueFallsInActivityResponseWindow(value, dateKey = state.activityDate) {
+      const { start, end } = activityResponseWindow(dateKey);
+      if (start === null || end === null) return false;
+      const current = timeValue(value);
+      return Number.isFinite(current) && current >= start && current <= end;
+    }
+
+    function callOverlapsActivityWindow(call, dateKey) {
+      const { start, end } = activityResponseWindow(dateKey);
+      if (start === null || end === null) return false;
+      const callStart = timeValue(callActivityStartTimestamp(call));
+      const callEnd = timeValue(callActivityEndTimestamp(call));
+      if (!Number.isFinite(callStart) && !Number.isFinite(callEnd)) return false;
+      const boundedStart = Number.isFinite(callStart) ? callStart : callEnd;
+      const boundedEnd = Number.isFinite(callEnd) ? callEnd : callStart;
+      return boundedStart <= end && boundedEnd >= start;
+    }
+
+    function activitySettingsSignature() {
+      return `${normalizedWorkStart()}|${normalizedWorkEnd()}|${normalizedWorkDaysValue()}`;
+    }
+
+    function resetActivityCaches() {
+      ACTIVITY_COUNTS_BY_DAY_CACHE.signature = "";
+      ACTIVITY_COUNTS_BY_DAY_CACHE.value = null;
+      ACTIVITY_DAY_METRICS_CACHE.clear();
+    }
+
+    function formatActivityClockTime(value) {
+      const minutes = minutesFromTimeString(value);
+      const hours24 = Math.floor(minutes / 60) % 24;
+      const displayHours = hours24 % 12 || 12;
+      const displayMinutes = pad2(minutes % 60);
+      const suffix = hours24 >= 12 ? "PM" : "AM";
+      return `${displayHours}:${displayMinutes}${suffix}`;
+    }
+
+    function activityWorkWindowLabel() {
+      return `${formatActivityClockTime(normalizedWorkStart())} to ${formatActivityClockTime(normalizedWorkEnd())}`;
+    }
+
+    function activityWindowSummary(metrics) {
+      return `${formatDurationHoursMinutes(metrics.activityWindowSeconds, "0m")} (${metrics.workWindowLabel})`;
+    }
+
     function formatDateRangeLabel(fromValue, toValue) {
       const fromLabel = formatDateOnly(fromValue);
       const toLabel = formatDateOnly(toValue);
@@ -2859,12 +3492,21 @@ HTML_TEMPLATE = """<!doctype html>
       callDirectionFilter.value = state.callDirection || "";
       callDateFrom.value = state.callDateFrom || "";
       callDateTo.value = state.callDateTo || "";
+      if (activityMonth) activityMonth.value = state.activityMonth || monthKeyFromDateKey(state.activityDate) || "";
+      if (activityWorkStart) activityWorkStart.value = normalizedWorkStart();
+      if (activityWorkEnd) activityWorkEnd.value = normalizedWorkEnd();
+      const checkedDays = configuredWorkdaySet();
+      for (const input of activityWorkdayInputs) {
+        input.checked = checkedDays.has(String(input.value));
+      }
     }
 
     function renderChrome() {
-      const modeLabel = state.view === "calls"
-        ? "Calls Workspace"
-        : (state.messageSearch ? "Search Workspace" : "Messages Workspace");
+      const modeLabel = state.view === "activity"
+        ? "Activity Diagnostics"
+        : (state.view === "calls"
+          ? "Calls Workspace"
+          : (state.messageSearch ? "Search Workspace" : "Messages Workspace"));
       if (brandProfile) brandProfile.textContent = `PROFILE: ${PROFILE_DISPLAY_NAME}`;
       if (overviewMode) overviewMode.textContent = modeLabel;
       if (appShell) appShell.dataset.view = state.view;
@@ -2895,7 +3537,7 @@ HTML_TEMPLATE = """<!doctype html>
           const label = messageViewFilterLabels[state.messageViewFilter] || state.messageViewFilter;
           entries.push({ key: "message-view-filter", label: `View: ${label}` });
         }
-      } else {
+      } else if (state.view === "calls") {
         if (state.callSearch) {
           entries.push({ key: "call-search", label: `Search: ${truncate(state.callSearch, 28)}` });
         }
@@ -2920,6 +3562,11 @@ HTML_TEMPLATE = """<!doctype html>
         if (state.callDateFrom || state.callDateTo) {
           entries.push({ key: "call-date", label: `Window: ${formatDateRangeLabel(state.callDateFrom, state.callDateTo)}` });
         }
+      } else if (state.view === "activity") {
+        if (state.activityDate) {
+          entries.push({ key: "activity-date", label: `Day: ${formatDateOnly(state.activityDate)}` });
+        }
+        entries.push({ key: "activity-window", label: `Work: ${activityWorkWindowLabel()}` });
       }
       return entries;
     }
@@ -2932,7 +3579,7 @@ HTML_TEMPLATE = """<!doctype html>
           <span>${escapeHtml(entry.label)}</span>
           <span class="dismiss">x</span>
         </button>
-      `).join("") || `<div class="subtle">No active filters. Press / to search.</div>`;
+      `).join("") || `<div class="subtle">${state.view === "activity" ? "Select a day on the calendar." : "No active filters. Press / to search."}</div>`;
     }
 
     function persistState() {
@@ -2948,6 +3595,11 @@ HTML_TEMPLATE = """<!doctype html>
           callDirection: state.callDirection,
           callDateFrom: state.callDateFrom,
           callDateTo: state.callDateTo,
+          activityDate: state.activityDate,
+          activityMonth: state.activityMonth,
+          activityWorkStart: normalizedWorkStart(),
+          activityWorkEnd: normalizedWorkEnd(),
+          activityWorkDays: normalizedWorkDaysValue(),
           messageViewFilter: state.messageViewFilter,
           threadDateFrom: state.threadDateFrom,
           threadDateTo: state.threadDateTo,
@@ -2982,6 +3634,11 @@ HTML_TEMPLATE = """<!doctype html>
           "callDirection",
           "callDateFrom",
           "callDateTo",
+          "activityDate",
+          "activityMonth",
+          "activityWorkStart",
+          "activityWorkEnd",
+          "activityWorkDays",
           "messageViewFilter",
           "threadDateFrom",
           "threadDateTo",
@@ -2994,7 +3651,7 @@ HTML_TEMPLATE = """<!doctype html>
         if (typeof parsed.expandHiddenData === "boolean") {
           state.expandHiddenData = parsed.expandHiddenData;
         }
-        if (!["messages", "calls"].includes(state.view)) state.view = "messages";
+        if (!["messages", "calls", "activity"].includes(state.view)) state.view = "messages";
         if (!["all", "messages", "calls", "events"].includes(state.messageViewFilter)) {
           state.messageViewFilter = "all";
         }
@@ -3004,6 +3661,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function focusActiveSearchField() {
+      if (state.view === "activity") return;
       const element = state.view === "calls" ? callSearch : messageSearch;
       if (!element) return;
       element.focus();
@@ -3119,6 +3777,11 @@ HTML_TEMPLATE = """<!doctype html>
         renderView();
         revealActiveListRow(threadList);
         scrollMainToTop();
+        return;
+      }
+
+      if (state.view === "activity") {
+        selectActivityDate(shiftDateKey(state.activityDate || todayDateKey(), direction));
         return;
       }
 
@@ -5114,6 +5777,1321 @@ HTML_TEMPLATE = """<!doctype html>
         .sort((left, right) => callPrimaryTimestampValue(right) - callPrimaryTimestampValue(left));
     }
 
+    function isCurrentUserIdentity(id, name) {
+      const guid = normalizeGuid(id || "");
+      const normalizedName = normalizeName(name || "");
+      return Boolean(
+        (CURRENT_USER_ID && guid && guid === CURRENT_USER_ID) ||
+        (CURRENT_USER_NAME && normalizedName && normalizedName === CURRENT_USER_NAME)
+      );
+    }
+
+    function isDiagnosticChatMessage(message) {
+      return Boolean(
+        message &&
+        !messageIsCallEvent(message) &&
+        !messageIsSystemEventRecord(message) &&
+        Number.isFinite(timeValue(message.timestamp))
+      );
+    }
+
+    function sortedChatMessagesAsc(thread) {
+      return (thread.messages || [])
+        .filter(isDiagnosticChatMessage)
+        .slice()
+        .sort((left, right) => {
+          const timeDiff = timeValue(left.timestamp) - timeValue(right.timestamp);
+          if (timeDiff !== 0) return timeDiff;
+          return (left.id || "").localeCompare(right.id || "");
+        });
+    }
+
+    function threadCounterpartyLabel(thread, message = null) {
+      if (message && !isOwnMessage(message)) {
+        return cleanCallParticipantName(message.sender_display_name || "") || "Originator";
+      }
+      const names = threadExternalParticipantNames(thread);
+      if (names.length) return summarizeNames(names, 2);
+      const fallback = threadDisplayLabel(thread);
+      return fallback && !isPlaceholderThreadLabel(fallback) ? fallback : "Target";
+    }
+
+    function durationBetweenValues(startValue, endValue) {
+      const start = timeValue(startValue);
+      const end = timeValue(endValue);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+      return Math.round((end - start) / 1000);
+    }
+
+    function communicationDurationSeconds(call) {
+      return durationBetweenValues(call.connect_time || call.start_time, call.end_time)
+        ?? durationBetweenValues(call.start_time, call.end_time);
+    }
+
+    function acceptedCallDurationSeconds(call) {
+      return isAcceptedCommunication(call) ? communicationDurationSeconds(call) : null;
+    }
+
+    function meetingDurationSeconds(call) {
+      return durationBetweenValues(call.connect_time || call.meeting_start_time || call.start_time, call.end_time || call.meeting_end_time)
+        ?? durationBetweenValues(call.meeting_start_time || call.start_time, call.meeting_end_time || call.end_time)
+        ?? communicationDurationSeconds(call);
+    }
+
+    function formatDurationPrecise(totalSeconds, emptyLabel = "Unavailable") {
+      if (!Number.isFinite(totalSeconds)) return emptyLabel;
+      let seconds = Math.max(0, Math.round(totalSeconds));
+      const hours = Math.floor(seconds / 3600);
+      seconds -= hours * 3600;
+      const minutes = Math.floor(seconds / 60);
+      seconds -= minutes * 60;
+      const parts = [];
+      if (hours) parts.push(`${hours}h`);
+      if (minutes || hours) parts.push(`${minutes}m`);
+      if (!hours) parts.push(`${seconds}s`);
+      return parts.join(" ") || "0s";
+    }
+
+    function formatDurationHoursMinutes(totalSeconds, emptyLabel = "Unavailable") {
+      if (!Number.isFinite(totalSeconds)) return emptyLabel;
+      const seconds = Math.max(0, Math.round(totalSeconds));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
+    }
+
+    function secondsStats(values) {
+      const sorted = (values || [])
+        .filter(value => Number.isFinite(value) && value >= 0)
+        .slice()
+        .sort((left, right) => left - right);
+      if (!sorted.length) {
+        return { count: 0, total: 0, average: null, median: null, min: null, max: null };
+      }
+      const total = sorted.reduce((sum, value) => sum + value, 0);
+      const middle = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 === 1
+        ? sorted[middle]
+        : ((sorted[middle - 1] + sorted[middle]) / 2);
+      return {
+        count: sorted.length,
+        total,
+        average: total / sorted.length,
+        median,
+        min: sorted[0],
+        max: sorted[sorted.length - 1],
+      };
+    }
+
+    function callActivityStartTimestamp(call) {
+      return call.meeting_start_time || call.start_time || call.connect_time || call.end_time || "";
+    }
+
+    function callActivityEndTimestamp(call) {
+      return call.end_time || call.meeting_end_time || call.connect_time || call.start_time || "";
+    }
+
+    function callOverlapsDate(call, dateKey) {
+      const { start, end } = selectedDayRange(dateKey);
+      if (start === null || end === null) return false;
+      const callStart = timeValue(callActivityStartTimestamp(call));
+      const callEnd = timeValue(callActivityEndTimestamp(call));
+      if (!Number.isFinite(callStart) && !Number.isFinite(callEnd)) return false;
+      const boundedStart = Number.isFinite(callStart) ? callStart : callEnd;
+      const boundedEnd = Number.isFinite(callEnd) ? callEnd : callStart;
+      return boundedStart <= end && boundedEnd >= start;
+    }
+
+    function isDeclinedCommunication(call) {
+      const value = displayCallState(call);
+      return value === "declined" || value === "rejected" || value === "cancelled";
+    }
+
+    function isMissedCommunication(call) {
+      return displayCallState(call) === "missed";
+    }
+
+    function isAcceptedCommunication(call) {
+      return !isMissedCommunication(call) && !isDeclinedCommunication(call) && Number.isFinite(communicationDurationSeconds(call));
+    }
+
+    function communicationOutcomeLabel(call) {
+      if (isMissedCommunication(call)) return "Missed";
+      if (isDeclinedCommunication(call)) return "Declined";
+      if (isAcceptedCommunication(call)) return "Accepted";
+      return displayCallStateLabel(call) || "Unknown";
+    }
+
+    function meetingStatusLabel(call) {
+      const participation = meetingParticipation(call);
+      if (participation === "joined") return "Attended";
+      if (participation === "missed") return "Missed";
+      return displayCallStateLabel(call) || "Scheduled";
+    }
+
+    function isAttendedMeeting(call) {
+      return meetingParticipation(call) === "joined";
+    }
+
+    function isMissedMeeting(call) {
+      return meetingParticipation(call) === "missed";
+    }
+
+    function callCounterpartyLabel(call) {
+      const entries = normalizeParticipantList(callParticipantEntries(call))
+        .filter(entry => !entry.hidden)
+        .filter(entry => !isCurrentUserParticipantEntry(entry))
+        .map(entry => normalizeTextValue(entry.label || entry.name || ""))
+        .filter(Boolean);
+      if (entries.length) return summarizeNames(entries, 2);
+      if (displayCallDirection(call) === "outgoing") return callSideLabel(call, "target") || "Target";
+      if (displayCallDirection(call) === "incoming") return callSideLabel(call, "originator") || "Originator";
+      return normalizeTextValue(callLabel(call)) || "Participant";
+    }
+
+    function activityGroupFirstTime(group) {
+      return Number.isFinite(group && group.firstTime) ? group.firstTime : Number.POSITIVE_INFINITY;
+    }
+
+    function compareActivityGroupsByFirstTimestamp(left, right) {
+      const timeDiff = activityGroupFirstTime(left) - activityGroupFirstTime(right);
+      if (timeDiff !== 0) return timeDiff;
+      return String(left && left.label || "").localeCompare(String(right && right.label || ""));
+    }
+
+    function callParticipantMetricGroups(calls) {
+      const groups = new Map();
+      const ensure = label => {
+        const key = normalizeTextValue(label || "Participant");
+        if (!groups.has(key)) {
+          groups.set(key, {
+            label: key,
+            accepted: 0,
+            missed: 0,
+            totalDuration: 0,
+            total: 0,
+            firstTimestamp: "",
+            firstTime: Number.POSITIVE_INFINITY,
+            firstCallKey: "",
+          });
+        }
+        return groups.get(key);
+      };
+      for (const call of calls || []) {
+        const group = ensure(callCounterpartyLabel(call));
+        group.total += 1;
+        const firstTimestamp = callActivityStartTimestamp(call);
+        const firstTime = timeValue(firstTimestamp);
+        if (Number.isFinite(firstTime) && firstTime < group.firstTime) {
+          group.firstTimestamp = firstTimestamp;
+          group.firstTime = firstTime;
+          group.firstCallKey = callKey(call);
+        }
+        if (isAcceptedCommunication(call)) {
+          group.accepted += 1;
+          const duration = acceptedCallDurationSeconds(call);
+          if (Number.isFinite(duration)) group.totalDuration += duration;
+        }
+        if (isMissedCommunication(call)) group.missed += 1;
+      }
+      return [...groups.values()].sort(compareActivityGroupsByFirstTimestamp);
+    }
+
+    function addActivityCount(map, dateKey, key, amount = 1, selfAmount = 0) {
+      if (!dateKey) return;
+      if (!map.has(dateKey)) {
+        map.set(dateKey, { messages: 0, calls: 0, meetings: 0, reactions: 0, total: 0, selfActivity: 0 });
+      }
+      const record = map.get(dateKey);
+      record[key] = (record[key] || 0) + amount;
+      record.total += amount;
+      record.selfActivity += selfAmount;
+    }
+
+    function activityCountsByDay() {
+      const signature = activitySettingsSignature();
+      if (ACTIVITY_COUNTS_BY_DAY_CACHE.value && ACTIVITY_COUNTS_BY_DAY_CACHE.signature === signature) {
+        return ACTIVITY_COUNTS_BY_DAY_CACHE.value;
+      }
+      const counts = new Map();
+      for (const thread of DATA.threads || []) {
+        for (const message of thread.messages || []) {
+          const messageDateKey = localDateKey(message.timestamp);
+          if (isDiagnosticChatMessage(message) && valueFallsInActivityWindow(message.timestamp, messageDateKey)) {
+            addActivityCount(counts, messageDateKey, "messages", 1, isOwnMessage(message) ? 1 : 0);
+          }
+          for (const reaction of messageReactions(message)) {
+            for (const user of reaction.users || []) {
+              if (!isCurrentUserIdentity(user.id, user.display_name)) continue;
+              const reactionDateKey = localDateKey(user.reacted_at);
+              if (valueFallsInActivityWindow(user.reacted_at, reactionDateKey)) {
+                addActivityCount(counts, reactionDateKey, "reactions", 1, 1);
+              }
+            }
+          }
+        }
+      }
+      for (const call of DATA.calls || []) {
+        const key = localDateKey(callActivityStartTimestamp(call));
+        if (!key || !callOverlapsActivityWindow(call, key)) continue;
+        let selfAmount = 0;
+        if (isMeetingCall(call)) {
+          selfAmount = isAttendedMeeting(call) ? 1 : 0;
+        } else if (displayCallDirection(call) === "outgoing" || isAcceptedCommunication(call)) {
+          selfAmount = 1;
+        }
+        addActivityCount(counts, key, isMeetingCall(call) ? "meetings" : "calls", 1, selfAmount);
+      }
+      ACTIVITY_COUNTS_BY_DAY_CACHE.signature = signature;
+      ACTIVITY_COUNTS_BY_DAY_CACHE.value = counts;
+      return counts;
+    }
+
+    function latestActivityDate() {
+      const keys = [...activityCountsByDay().keys()].sort();
+      return keys[keys.length - 1] || "";
+    }
+
+    function ensureActivityDate() {
+      if (!String(state.activityDate || "").match(/^\\d{4}-\\d{2}-\\d{2}$/)) {
+        state.activityDate = latestActivityDate() || todayDateKey();
+      }
+      if (!parseMonthKey(state.activityMonth)) {
+        state.activityMonth = monthKeyFromDateKey(state.activityDate) || monthKeyFromDateKey(todayDateKey());
+      }
+      if (!monthKeyFromDateKey(state.activityDate)) {
+        state.activityDate = latestActivityDate() || todayDateKey();
+      }
+    }
+
+    function selectActivityDate(dateKey) {
+      const normalized = String(dateKey || "").match(/^\\d{4}-\\d{2}-\\d{2}$/) ? dateKey : todayDateKey();
+      state.activityDate = normalized;
+      state.activityMonth = monthKeyFromDateKey(normalized);
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
+      renderView();
+    }
+
+    function activityResponsePairs(dateKey) {
+      const userResponses = [];
+      const counterpartResponses = [];
+      for (const thread of DATA.threads || []) {
+        const messages = sortedChatMessagesAsc(thread)
+          .filter(message => valueFallsInActivityResponseWindow(message.timestamp, dateKey));
+        let pending = null;
+        for (let index = 0; index < messages.length; index += 1) {
+          const current = messages[index];
+          const currentIsOwn = isOwnMessage(current);
+          if (!valueFallsInActivityResponseWindow(current.timestamp, dateKey)) continue;
+          if (!pending) {
+            pending = current;
+            continue;
+          }
+          if (isOwnMessage(pending) === currentIsOwn) {
+            pending = current;
+            continue;
+          }
+          const previous = pending;
+          if (!valueFallsInActivityResponseWindow(previous.timestamp, dateKey)) {
+            pending = current;
+            continue;
+          }
+          const delta = (timeValue(current.timestamp) - timeValue(previous.timestamp)) / 1000;
+          if (!Number.isFinite(delta) || delta < 0) continue;
+          if (currentIsOwn) {
+            userResponses.push({
+              seconds: delta,
+              thread,
+              previous,
+              current,
+              counterparty: threadCounterpartyLabel(thread, previous),
+            });
+          } else {
+            counterpartResponses.push({
+              seconds: delta,
+              thread,
+              previous,
+              current,
+              counterparty: threadCounterpartyLabel(thread, current),
+            });
+          }
+          pending = current;
+        }
+      }
+      return { userResponses, counterpartResponses };
+    }
+
+    function longestRapidChat(dayThreadMessages) {
+      let best = null;
+      const maxGapMs = 10 * 60 * 1000;
+      for (const entry of dayThreadMessages) {
+        const messages = entry.messages;
+        let current = [];
+        const finalize = () => {
+          if (current.length < 2) return;
+          let hasBackAndForth = false;
+          for (let index = 1; index < current.length; index += 1) {
+            if (isOwnMessage(current[index]) !== isOwnMessage(current[index - 1])) {
+              hasBackAndForth = true;
+              break;
+            }
+          }
+          if (!hasBackAndForth) return;
+          const first = current[0];
+          const last = current[current.length - 1];
+          const duration = (timeValue(last.timestamp) - timeValue(first.timestamp)) / 1000;
+          if (!best || duration > best.durationSeconds) {
+            best = {
+              thread: entry.thread,
+              first,
+              last,
+              count: current.length,
+              durationSeconds: duration,
+            };
+          }
+        };
+        for (const message of messages) {
+          const previous = current[current.length - 1];
+          if (!previous || timeValue(message.timestamp) - timeValue(previous.timestamp) <= maxGapMs) {
+            current.push(message);
+            continue;
+          }
+          finalize();
+          current = [message];
+        }
+        finalize();
+      }
+      return best;
+    }
+
+    function groupedMessageCounterpartMetrics(dayMessages, responses) {
+      const groups = new Map();
+      const ensure = label => {
+        const key = normalizeTextValue(label || "Unknown");
+        if (!groups.has(key)) {
+          groups.set(key, {
+            label: key,
+            sent: 0,
+            received: 0,
+            userResponseSeconds: [],
+            counterpartResponseSeconds: [],
+            firstTimestamp: "",
+            firstTime: Number.POSITIVE_INFINITY,
+            firstThread: null,
+            firstMessageId: "",
+            lastTimestamp: "",
+          });
+        }
+        return groups.get(key);
+      };
+      for (const item of dayMessages) {
+        const label = threadCounterpartyLabel(item.thread, item.message);
+        const group = ensure(label);
+        if (isOwnMessage(item.message)) group.sent += 1;
+        else group.received += 1;
+        const currentTime = timeValue(item.message.timestamp);
+        if (Number.isFinite(currentTime) && currentTime < group.firstTime) {
+          group.firstTimestamp = item.message.timestamp;
+          group.firstTime = currentTime;
+          group.firstThread = item.thread;
+          group.firstMessageId = item.message.id || "";
+        }
+        if (!group.lastTimestamp || timeValue(item.message.timestamp) > timeValue(group.lastTimestamp)) {
+          group.lastTimestamp = item.message.timestamp;
+        }
+      }
+      for (const pair of responses.userResponses || []) {
+        ensure(pair.counterparty).userResponseSeconds.push(pair.seconds);
+      }
+      for (const pair of responses.counterpartResponses || []) {
+        ensure(pair.counterparty).counterpartResponseSeconds.push(pair.seconds);
+      }
+      return [...groups.values()].sort(compareActivityGroupsByFirstTimestamp);
+    }
+
+    function buildActivityDayMetrics(dateKey) {
+      const cacheKey = `${dateKey}|${activitySettingsSignature()}`;
+      if (ACTIVITY_DAY_METRICS_CACHE.has(cacheKey)) return ACTIVITY_DAY_METRICS_CACHE.get(cacheKey);
+      const actions = [];
+      const dayMessages = [];
+      const dayThreadMessages = [];
+      for (const thread of DATA.threads || []) {
+        const threadMessages = sortedChatMessagesAsc(thread).filter(message => valueFallsInActivityWindow(message.timestamp, dateKey));
+        if (!threadMessages.length) continue;
+        dayThreadMessages.push({ thread, messages: threadMessages });
+        for (const message of threadMessages) {
+          dayMessages.push({ thread, message });
+          actions.push({
+            timestamp: message.timestamp,
+            time: timeValue(message.timestamp),
+            action: isOwnMessage(message) ? "Message sent" : "Message received",
+            detail: threadCounterpartyLabel(thread, message),
+          });
+        }
+      }
+
+      let reactionCount = 0;
+      for (const thread of DATA.threads || []) {
+        for (const message of thread.messages || []) {
+          for (const reaction of messageReactions(message)) {
+            for (const user of reaction.users || []) {
+              if (!isCurrentUserIdentity(user.id, user.display_name)) continue;
+              if (!valueFallsInActivityWindow(user.reacted_at, dateKey)) continue;
+              reactionCount += 1;
+              actions.push({
+                timestamp: user.reacted_at,
+                time: timeValue(user.reacted_at),
+                action: "Reaction added",
+                detail: `${reaction.label} | ${threadDisplayLabel(thread)}`,
+              });
+            }
+          }
+        }
+      }
+
+      const allDayCalls = (DATA.calls || []).filter(call => callOverlapsActivityWindow(call, dateKey));
+      const dayCalls = allDayCalls.filter(call => !isMeetingCall(call));
+      const dayMeetings = allDayCalls.filter(isMeetingCall);
+      for (const call of dayCalls) {
+        const start = callActivityStartTimestamp(call);
+        const end = callActivityEndTimestamp(call);
+        if (valueFallsInActivityWindow(start, dateKey)) {
+          actions.push({
+            timestamp: start,
+            time: timeValue(start),
+            action: displayCallDirection(call) === "outgoing" ? "Outbound call started" : "Inbound call received",
+            detail: callCounterpartyLabel(call),
+          });
+        }
+        if (end && end !== start && valueFallsInActivityWindow(end, dateKey)) {
+          actions.push({
+            timestamp: end,
+            time: timeValue(end),
+            action: "Call ended",
+            detail: callCounterpartyLabel(call),
+          });
+        }
+      }
+      for (const meeting of dayMeetings) {
+        const start = callActivityStartTimestamp(meeting);
+        const end = callActivityEndTimestamp(meeting);
+        if (valueFallsInActivityWindow(start, dateKey)) {
+          actions.push({
+            timestamp: start,
+            time: timeValue(start),
+            action: "Meeting started",
+            detail: normalizeTextValue(meeting.meeting_subject || callLabel(meeting)),
+          });
+        }
+        if (end && end !== start && valueFallsInActivityWindow(end, dateKey)) {
+          actions.push({
+            timestamp: end,
+            time: timeValue(end),
+            action: "Meeting ended",
+            detail: normalizeTextValue(meeting.meeting_subject || callLabel(meeting)),
+          });
+        }
+      }
+      actions.sort((left, right) => left.time - right.time);
+
+      dayMessages.sort((left, right) => timeValue(left.message.timestamp) - timeValue(right.message.timestamp));
+      const sentMessages = dayMessages.filter(item => isOwnMessage(item.message));
+      const receivedMessages = dayMessages.filter(item => !isOwnMessage(item.message));
+      const endedChats = dayThreadMessages.filter(entry => isOwnMessage(entry.messages[entry.messages.length - 1])).length;
+      const ghostedChats = dayThreadMessages.filter(entry => !isOwnMessage(entry.messages[entry.messages.length - 1])).length;
+      const responses = activityResponsePairs(dateKey);
+      const userResponseStats = secondsStats(responses.userResponses.map(pair => pair.seconds));
+      const counterpartResponseStats = secondsStats(responses.counterpartResponses.map(pair => pair.seconds));
+      const longestChat = longestRapidChat(dayThreadMessages);
+      const firstSent = sentMessages[0] || null;
+      const firstReceived = receivedMessages[0] || null;
+      const messageCounterpartGroups = groupedMessageCounterpartMetrics(dayMessages, responses);
+
+      const acceptedCalls = dayCalls.filter(isAcceptedCommunication);
+      const acceptedCallDurations = acceptedCalls.map(acceptedCallDurationSeconds).filter(Number.isFinite);
+      const callDurationStats = secondsStats(acceptedCallDurations);
+      const inboundCalls = dayCalls.filter(call => displayCallDirection(call) === "incoming");
+      const outboundCalls = dayCalls.filter(call => displayCallDirection(call) === "outgoing");
+      const firstOutboundCall = outboundCalls.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)))[0] || null;
+      const firstInboundCall = inboundCalls.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)))[0] || null;
+      const inboundCallGroups = callParticipantMetricGroups(inboundCalls);
+      const outboundCallGroups = callParticipantMetricGroups(outboundCalls);
+
+      const attendedMeetings = dayMeetings.filter(isAttendedMeeting);
+      const missedMeetings = dayMeetings.filter(isMissedMeeting);
+      const meetingDurations = attendedMeetings.map(meetingDurationSeconds).filter(Number.isFinite);
+      const meetingDurationStats = secondsStats(meetingDurations);
+      const meetingsByTime = dayMeetings.slice().sort((left, right) => timeValue(callActivityStartTimestamp(left)) - timeValue(callActivityStartTimestamp(right)));
+
+      const metrics = {
+        dateKey,
+        workWindowLabel: activityWorkWindowLabel(),
+        actions,
+        firstAction: actions[0] || null,
+        lastAction: actions[actions.length - 1] || null,
+        activityWindowSeconds: actions.length > 1 ? ((actions[actions.length - 1].time - actions[0].time) / 1000) : (actions.length === 1 ? 0 : null),
+        selfActivityScore: (activityCountsByDay().get(dateKey) || {}).selfActivity || 0,
+        reactions: reactionCount,
+        messages: {
+          totalChats: dayThreadMessages.length,
+          totalMessages: dayMessages.length,
+          sent: sentMessages.length,
+          received: receivedMessages.length,
+          endedChats,
+          ghostedChats,
+          longestChat,
+          userResponseStats,
+          counterpartResponseStats,
+          firstSent,
+          firstReceived,
+          counterpartGroups: messageCounterpartGroups,
+        },
+        calls: {
+          total: dayCalls.length,
+          received: inboundCalls.length,
+          sent: outboundCalls.length,
+          totalDurationSeconds: acceptedCallDurations.reduce((sum, value) => sum + value, 0),
+          durationStats: callDurationStats,
+          accepted: acceptedCalls.length,
+          firstOutboundCall,
+          firstInboundCall,
+          inboundGroups: inboundCallGroups,
+          outboundGroups: outboundCallGroups,
+        },
+        meetings: {
+          total: dayMeetings.length,
+          attended: attendedMeetings.length,
+          missed: missedMeetings.length,
+          totalDurationSeconds: meetingDurations.reduce((sum, value) => sum + value, 0),
+          durationStats: meetingDurationStats,
+          first: meetingsByTime[0] || null,
+          last: meetingsByTime[meetingsByTime.length - 1] || null,
+        },
+      };
+      ACTIVITY_DAY_METRICS_CACHE.set(cacheKey, metrics);
+      return metrics;
+    }
+
+    function renderActivityMetric(label, value) {
+      return `<div class="stat-card"><div class="k">${escapeHtml(label)}</div><div class="v">${escapeHtml(value)}</div></div>`;
+    }
+
+    function renderActivityMetricGrid(items) {
+      return `<div class="activity-metric-grid">${items.map(item => renderActivityMetric(item.label, item.value)).join("")}</div>`;
+    }
+
+    function renderActivityRecord(title, fields) {
+      return `
+        <div class="activity-target-card">
+          <div class="activity-target-title">${escapeHtml(title)}</div>
+          <div class="activity-target-stats">
+            ${fields.map(field => `
+              <div class="activity-target-stat">
+                ${escapeHtml(field.label)}
+                <strong>${escapeHtml(field.value)}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderActivitySection(title, subtitle, bodyHtml) {
+      return `
+        <section class="activity-section">
+          <div class="activity-section-head">
+            <div>
+              <div class="activity-section-title">${escapeHtml(title)}</div>
+              ${subtitle ? `<div class="activity-section-subtitle">${escapeHtml(subtitle)}</div>` : ``}
+            </div>
+          </div>
+          ${bodyHtml}
+        </section>
+      `;
+    }
+
+    function activityActionDisplayName(action) {
+      const labels = {
+        "Message sent": "Message Sent",
+        "Message received": "Message Received",
+        "Reaction added": "Reaction Added",
+        "Outbound call started": "Outbound Call Started",
+        "Inbound call received": "Inbound Call Received",
+        "Call ended": "Call Ended",
+        "Meeting started": "Meeting Started",
+        "Meeting ended": "Meeting Ended",
+      };
+      return labels[action] || action || "Action";
+    }
+
+    function renderActivityActionRecord(record, emptyLabel, prefix = "") {
+      if (!record) {
+        return renderActivityRecord(emptyLabel, [
+          { label: "Action", value: "No activity" },
+          { label: "Timestamp", value: "Unavailable" },
+        ]);
+      }
+      const title = prefix
+        ? `${prefix} ${activityActionDisplayName(record.action)}`
+        : activityActionDisplayName(record.action);
+      return renderActivityRecord(title, [
+        { label: "Timestamp", value: fmt(record.timestamp) },
+        { label: "Detail", value: record.detail || "Unavailable" },
+      ]);
+    }
+
+    function threadResponseStatsFor(pairs, thread) {
+      if (!thread) return secondsStats([]);
+      return secondsStats((pairs || []).filter(pair => pair.thread === thread).map(pair => pair.seconds));
+    }
+
+    function renderFirstMessageRecord(title, item, responseStats, responseLabel) {
+      if (!item) {
+        return renderActivityRecord(title, [
+          { label: "Timestamp", value: "No chat found" },
+          { label: "Participant", value: "Unavailable" },
+          { label: responseLabel, value: "Unavailable" },
+          { label: "Median response", value: "Unavailable" },
+        ]);
+      }
+      return renderActivityRecord(title, [
+        { label: "Timestamp", value: fmt(item.message.timestamp) },
+        { label: "Participant", value: threadCounterpartyLabel(item.thread, item.message) },
+        { label: responseLabel, value: formatDurationPrecise(responseStats.average) },
+        { label: "Median response", value: formatDurationPrecise(responseStats.median) },
+      ]);
+    }
+
+    function renderCallRecord(title, call) {
+      if (!call) {
+        return renderActivityRecord(title, [
+          { label: "Timestamp", value: "No call found" },
+          { label: "Participant", value: "Unavailable" },
+          { label: "Status", value: "Unavailable" },
+          { label: "Duration", value: "Unavailable" },
+        ]);
+      }
+      return renderActivityRecord(title, [
+        { label: "Timestamp", value: fmt(callActivityStartTimestamp(call)) },
+        { label: "Participant", value: callCounterpartyLabel(call) },
+        { label: "Status", value: communicationOutcomeLabel(call) },
+        { label: "Duration", value: formatDurationPrecise(acceptedCallDurationSeconds(call)) },
+      ]);
+    }
+
+    function renderMeetingRecord(title, meeting) {
+      if (!meeting) {
+        return renderActivityRecord(title, [
+          { label: "Meeting", value: "No meeting found" },
+          { label: "Timestamp", value: "Unavailable" },
+          { label: "Status", value: "Unavailable" },
+          { label: "Duration", value: "Unavailable" },
+        ]);
+      }
+      return renderActivityRecord(title, [
+        { label: "Meeting", value: normalizeTextValue(meeting.meeting_subject || callLabel(meeting)) || "Meeting" },
+        { label: "Timestamp", value: fmt(callActivityStartTimestamp(meeting)) },
+        { label: "Status", value: meetingStatusLabel(meeting) },
+        { label: "Duration", value: formatDurationPrecise(meetingDurationSeconds(meeting)) },
+      ]);
+    }
+
+    function renderActivityTargetCards(groups, fieldsForGroup, emptyLabel, options = {}) {
+      if (!groups.length) return `<div class="empty">${escapeHtml(emptyLabel)}</div>`;
+      return `
+        <div class="activity-target-grid">
+          ${groups.map(group => {
+            const target = options.targetForGroup ? options.targetForGroup(group) : null;
+            const timestampLabel = options.timestampForGroup ? options.timestampForGroup(group) : "";
+            const attrs = target
+              ? [
+                  `role="button"`,
+                  `tabindex="0"`,
+                  `data-activity-target-kind="${escapeHtml(target.kind || "")}"`,
+                  target.threadId ? `data-activity-thread-id="${escapeHtml(target.threadId)}"` : "",
+                  target.focusMessageId ? `data-activity-focus-message-id="${escapeHtml(target.focusMessageId)}"` : "",
+                  target.callKey ? `data-activity-call-key="${escapeHtml(target.callKey)}"` : "",
+                  target.focusTimestamp ? `data-activity-focus-timestamp="${escapeHtml(target.focusTimestamp)}"` : "",
+                  target.dateKey ? `data-activity-date-key="${escapeHtml(target.dateKey)}"` : "",
+                  target.callDirection ? `data-activity-call-direction="${escapeHtml(target.callDirection)}"` : "",
+                ].filter(Boolean).join(" ")
+              : "";
+            return `
+            <div class="activity-target-card ${target ? "activity-target-link" : ""}" ${attrs}>
+              <div class="activity-target-head">
+                <div class="activity-target-title">${escapeHtml(group.label)}</div>
+                ${timestampLabel ? `<div class="activity-target-time">${escapeHtml(timestampLabel)}</div>` : ``}
+              </div>
+              <div class="activity-target-stats">
+                ${fieldsForGroup(group).map(field => `
+                  <div class="activity-target-stat">
+                    ${escapeHtml(field.label)}
+                    <strong>${escapeHtml(field.value)}</strong>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function initActivityTargetLinks(scope) {
+      const activate = element => {
+        const kind = element.dataset.activityTargetKind || "";
+        const focusTimestamp = element.dataset.activityFocusTimestamp || "";
+        const dateKey = element.dataset.activityDateKey || localDateKey(focusTimestamp) || state.activityDate;
+        if (kind === "message") {
+          state.messageDateFrom = dateKey;
+          state.messageDateTo = dateKey;
+          openThreadView({
+            threadId: element.dataset.activityThreadId,
+            clearSearch: true,
+            clearCategory: true,
+            syncThreadDateToSidebar: true,
+            viewFilter: "all",
+            focusMessageId: element.dataset.activityFocusMessageId || null,
+            focusTimestamp: focusTimestamp || null,
+            revealInSidebar: true,
+          });
+          return;
+        }
+        if (kind === "call") {
+          state.callSearch = "";
+          state.callGroup = "";
+          state.callDirection = element.dataset.activityCallDirection || "";
+          state.callDateFrom = dateKey;
+          state.callDateTo = dateKey;
+          openCallView({
+            callKey: element.dataset.activityCallKey,
+            revealInSidebar: true,
+            scrollTop: true,
+          });
+        }
+      };
+      for (const element of scope.querySelectorAll(".activity-target-link")) {
+        element.addEventListener("click", () => activate(element));
+        element.addEventListener("keydown", event => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          activate(element);
+        });
+      }
+    }
+
+    function normalizeDateKeyInput(value, fallback) {
+      const text = String(value || "").trim();
+      return /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? text : fallback;
+    }
+
+    function dateKeyToLocalDate(dateKey) {
+      const match = String(dateKey || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+      if (!match) return null;
+      return new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
+    }
+
+    function enumerateDateKeys(fromDateKey, toDateKey) {
+      const fromDate = dateKeyToLocalDate(fromDateKey);
+      const toDate = dateKeyToLocalDate(toDateKey);
+      if (!fromDate || !toDate) return [];
+      const start = fromDate <= toDate ? fromDate : toDate;
+      const end = fromDate <= toDate ? toDate : fromDate;
+      const keys = [];
+      const current = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      while (current <= end && keys.length < 3660) {
+        keys.push(localDateKeyFromDate(current));
+        current.setDate(current.getDate() + 1);
+      }
+      return keys;
+    }
+
+    function csvCell(value) {
+      const text = String(value ?? "");
+      return /[",\\n\\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function activityCsvPush(rows, dateKey, section, subject, metric, value, detail = "") {
+      rows.push([
+        dateKey,
+        section,
+        subject,
+        metric,
+        value,
+        detail,
+      ]);
+    }
+
+    function activityCsvRowsForDate(dateKey) {
+      const metrics = buildActivityDayMetrics(dateKey);
+      const rows = [];
+      const messageStats = metrics.messages;
+      const callStats = metrics.calls.durationStats;
+      const meetingStats = metrics.meetings.durationStats;
+
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Work window", metrics.workWindowLabel);
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Activity window", activityWindowSummary(metrics));
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Observed actions", metrics.actions.length);
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Self activity score", metrics.selfActivityScore);
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Messages", messageStats.totalMessages);
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Calls", metrics.calls.total);
+      activityCsvPush(rows, dateKey, "Summary", "Day", "Meetings", metrics.meetings.total);
+      if (metrics.firstAction) {
+        activityCsvPush(rows, dateKey, "Activity Window", "First Action", activityActionDisplayName(metrics.firstAction.action), fmt(metrics.firstAction.timestamp), metrics.firstAction.detail || "");
+      }
+      if (metrics.lastAction) {
+        activityCsvPush(rows, dateKey, "Activity Window", "Last Action", activityActionDisplayName(metrics.lastAction.action), fmt(metrics.lastAction.timestamp), metrics.lastAction.detail || "");
+      }
+
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Total chats", messageStats.totalChats);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Total messages", messageStats.totalMessages);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Messages received", messageStats.received);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Messages sent", messageStats.sent);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Chats ended by user", messageStats.endedChats);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Chats awaiting user", messageStats.ghostedChats);
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "User average response", formatDurationPrecise(messageStats.userResponseStats.average));
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "User median response", formatDurationPrecise(messageStats.userResponseStats.median));
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Colleague average response", formatDurationPrecise(messageStats.counterpartResponseStats.average));
+      activityCsvPush(rows, dateKey, "Messages", "Overview", "Colleague median response", formatDurationPrecise(messageStats.counterpartResponseStats.median));
+      if (messageStats.longestChat) {
+        activityCsvPush(
+          rows,
+          dateKey,
+          "Messages",
+          threadDisplayLabel(messageStats.longestChat.thread),
+          "Longest rapid chat",
+          formatDurationPrecise(messageStats.longestChat.durationSeconds),
+          `${messageStats.longestChat.count} timeline items`
+        );
+      }
+      for (const group of messageStats.counterpartGroups) {
+        const userStats = secondsStats(group.userResponseSeconds);
+        const counterpartStats = secondsStats(group.counterpartResponseSeconds);
+        activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "Sent", group.sent);
+        activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "Received", group.received);
+        activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "First timestamp", fmt(group.firstTimestamp));
+        activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "User average response", formatDurationPrecise(userStats.average));
+        activityCsvPush(rows, dateKey, "Coworker Message Snapshot", group.label, "Their average response", formatDurationPrecise(counterpartStats.average));
+      }
+
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Calls total", metrics.calls.total);
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Calls received", metrics.calls.received);
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Calls sent", metrics.calls.sent);
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Accepted calls", metrics.calls.accepted);
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Total duration", formatDurationPrecise(metrics.calls.totalDurationSeconds, "0s"));
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Shortest accepted call", formatDurationPrecise(callStats.min));
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Average accepted call", formatDurationPrecise(callStats.average));
+      activityCsvPush(rows, dateKey, "User Call Metrics", "Profile", "Longest accepted call", formatDurationPrecise(callStats.max));
+      const pushCallGroupRows = (section, group) => {
+        activityCsvPush(rows, dateKey, section, group.label, "First timestamp", fmt(group.firstTimestamp));
+        activityCsvPush(rows, dateKey, section, group.label, "Accepted", group.accepted);
+        activityCsvPush(rows, dateKey, section, group.label, "Missed", group.missed);
+        activityCsvPush(rows, dateKey, section, group.label, "Total calls", group.total);
+        activityCsvPush(rows, dateKey, section, group.label, "Total duration", formatDurationPrecise(group.totalDuration, "0s"));
+      };
+      for (const group of metrics.calls.inboundGroups) pushCallGroupRows("Inbound Call Metrics", group);
+      for (const group of metrics.calls.outboundGroups) pushCallGroupRows("Outbound Call Metrics", group);
+
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Meetings scheduled", metrics.meetings.total);
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Meetings attended", metrics.meetings.attended);
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Meetings missed", metrics.meetings.missed);
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Total meeting time", formatDurationPrecise(metrics.meetings.totalDurationSeconds, "0s"));
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Average attended meeting", formatDurationPrecise(meetingStats.average));
+      activityCsvPush(rows, dateKey, "Meetings", "Overview", "Median attended meeting", formatDurationPrecise(meetingStats.median));
+      return rows;
+    }
+
+    function buildActivityCsv(fromDateKey, toDateKey) {
+      const rows = [["date", "section", "subject", "metric", "value", "detail"]];
+      for (const dateKey of enumerateDateKeys(fromDateKey, toDateKey)) {
+        rows.push(...activityCsvRowsForDate(dateKey));
+      }
+      return rows.map(row => row.map(csvCell).join(",")).join("\\n");
+    }
+
+    function downloadActivityCsv(fromDateKey, toDateKey) {
+      const csv = buildActivityCsv(fromDateKey, toDateKey);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `teams_activity_${fromDateKey}_to_${toDateKey}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("Activity CSV exported");
+    }
+
+    function quantile(sortedValues, ratio) {
+      const values = sortedValues || [];
+      if (!values.length) return null;
+      const index = Math.min(values.length - 1, Math.max(0, Math.floor((values.length - 1) * ratio)));
+      return values[index];
+    }
+
+    function activityIntensityForScore(score) {
+      if (!Number.isFinite(score) || score <= 0) return "none";
+      const scores = [...activityCountsByDay().values()]
+        .map(record => record.selfActivity || 0)
+        .filter(value => value > 0)
+        .sort((left, right) => left - right);
+      if (!scores.length) return "none";
+      if (scores[0] === scores[scores.length - 1]) return "average";
+      if (score >= quantile(scores, .75)) return "high";
+      if (score >= quantile(scores, .40)) return "average";
+      if (score >= quantile(scores, .15)) return "low";
+      return "minimal";
+    }
+
+    function activityIntensityLabel(intensity) {
+      const labels = {
+        none: "None",
+        minimal: "Minimal",
+        low: "Low",
+        average: "Average",
+        high: "Very active",
+      };
+      return labels[intensity] || "None";
+    }
+
+    function bestActivityDateForMonth(monthKey) {
+      const keys = [...activityCountsByDay().keys()]
+        .filter(key => monthKeyFromDateKey(key) === monthKey)
+        .sort();
+      return keys[0] || dateKeyInMonth(monthKey, 1) || todayDateKey();
+    }
+
+    function renderActivityCalendar() {
+      ensureActivityDate();
+      const parsed = parseMonthKey(state.activityMonth)
+        || parseMonthKey(monthKeyFromDateKey(state.activityDate))
+        || parseMonthKey(monthKeyFromDateKey(todayDateKey()));
+      const counts = activityCountsByDay();
+      const firstOfMonth = new Date(parsed.year, parsed.month - 1, 1);
+      const todayKey = todayDateKey();
+      const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const cells = [];
+      const firstWeekday = firstOfMonth.getDay();
+      for (let index = 0; index < 42; index += 1) {
+        const cellDate = new Date(parsed.year, parsed.month - 1, 1 - firstWeekday + index);
+        const dateKey = localDateKeyFromDate(cellDate);
+        const record = counts.get(dateKey) || {};
+        const total = record.total || 0;
+        const selfActivity = record.selfActivity || 0;
+        const intensity = activityIntensityForScore(selfActivity);
+        const workday = isConfiguredWorkday(dateKey);
+        const classes = [
+          "calendar-day",
+          cellDate.getMonth() === parsed.month - 1 ? "" : "outside",
+          workday ? "" : "off-workday",
+          workday && selfActivity <= 0 ? "inactive-workday" : "",
+          dateKey === state.activityDate ? "active" : "",
+          dateKey === todayKey ? "today" : "",
+        ].filter(Boolean).join(" ");
+        cells.push(`
+          <button type="button" class="${escapeHtml(classes)}" data-date="${escapeHtml(dateKey)}" aria-label="${escapeHtml(`${formatDateOnly(dateKey)} | ${activityIntensityLabel(intensity)} | ${selfActivity} self actions | ${total} observed items`)}">
+            <span class="calendar-date-num">${escapeHtml(String(cellDate.getDate()))}</span>
+            <span class="calendar-activity-dot ${escapeHtml(intensity)}"></span>
+            <span class="calendar-count">${total ? escapeHtml(NUMBER_FORMATTER.format(total)) : ""}</span>
+          </button>
+        `);
+      }
+      return `
+        <div class="activity-calendar">
+          <div class="calendar-heading">
+            <span>${escapeHtml(formatDateOnly(state.activityDate))}</span>
+          </div>
+          <div class="calendar-grid">
+            ${weekdayLabels.map(label => `<div class="calendar-weekday">${escapeHtml(label)}</div>`).join("")}
+            ${cells.join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderActivityList() {
+      ensureActivityDate();
+      const metrics = buildActivityDayMetrics(state.activityDate);
+      sidebarCount.textContent = formatDateOnly(state.activityDate) || "Activity day";
+      activityList.innerHTML = `
+        ${renderActivityCalendar()}
+        <div class="activity-sidebar-summary">
+          <div class="activity-sidebar-stat"><span>Window</span><strong>${escapeHtml(activityWindowSummary(metrics))}</strong></div>
+          <div class="activity-sidebar-stat"><span>Messages</span><strong>${escapeHtml(NUMBER_FORMATTER.format(metrics.messages.totalMessages))}</strong></div>
+          <div class="activity-sidebar-stat"><span>Calls</span><strong>${escapeHtml(NUMBER_FORMATTER.format(metrics.calls.total))}</strong></div>
+          <div class="activity-sidebar-stat"><span>Meetings</span><strong>${escapeHtml(NUMBER_FORMATTER.format(metrics.meetings.total))}</strong></div>
+        </div>
+      `;
+      for (const day of activityList.querySelectorAll(".calendar-day[data-date]")) {
+        day.addEventListener("click", () => {
+          selectActivityDate(day.dataset.date);
+        });
+      }
+    }
+
+    function renderActivityPanel() {
+      ensureActivityDate();
+      const metrics = buildActivityDayMetrics(state.activityDate);
+      const responses = activityResponsePairs(state.activityDate);
+      const firstSentStats = metrics.messages.firstSent
+        ? threadResponseStatsFor(responses.counterpartResponses, metrics.messages.firstSent.thread)
+        : secondsStats([]);
+      const firstReceivedStats = metrics.messages.firstReceived
+        ? threadResponseStatsFor(responses.userResponses, metrics.messages.firstReceived.thread)
+        : secondsStats([]);
+      const callStats = metrics.calls.durationStats;
+      const meetingStats = metrics.meetings.durationStats;
+      const longestChat = metrics.messages.longestChat;
+      contentPanel.innerHTML = `
+        <div class="activity-report">
+          <section class="detail-hero">
+            <div class="kicker">Day View Diagnostics</div>
+            <div class="title">
+              <h2>${escapeHtml(formatDateOnly(metrics.dateKey))}</h2>
+              <div class="chip chip-strong">${escapeHtml(NUMBER_FORMATTER.format(metrics.actions.length))} observed actions</div>
+            </div>
+            <div class="detail-subtle">Profile activity and counterpart activity involving ${escapeHtml(PROFILE_DISPLAY_NAME)} inside the selected work window.</div>
+            <div class="activity-report-actions">
+              <button type="button" class="call-link open-activity-messages">Open Messages For Day</button>
+              <button type="button" class="call-link open-activity-calls">Open Calls For Day</button>
+              <button type="button" class="call-link toggle-activity-export">Export CSV</button>
+              <div class="activity-export-panel ${state.activityExportOpen ? "" : "hidden"}">
+                <label class="range-field">
+                  <span>Export From</span>
+                  <input type="date" class="activity-export-from" value="${escapeHtml(state.activityExportFrom || metrics.dateKey)}">
+                </label>
+                <label class="range-field">
+                  <span>Export To</span>
+                  <input type="date" class="activity-export-to" value="${escapeHtml(state.activityExportTo || metrics.dateKey)}">
+                </label>
+                <button type="button" class="call-link download-activity-export">Download CSV</button>
+              </div>
+            </div>
+          </section>
+          ${renderActivitySection(
+            "Teams Activity Window",
+            "First observed action through last observed action for the selected date.",
+            `
+              ${renderActivityMetricGrid([
+                { label: "Messages", value: NUMBER_FORMATTER.format(metrics.messages.totalMessages) },
+                { label: "Calls", value: NUMBER_FORMATTER.format(metrics.calls.total) },
+                { label: "Meetings", value: NUMBER_FORMATTER.format(metrics.meetings.total) },
+                { label: "Observed Actions", value: NUMBER_FORMATTER.format(metrics.actions.length) },
+              ])}
+              <div class="activity-record-grid">
+                ${renderActivityActionRecord(metrics.firstAction, "First Action", "First")}
+                ${renderActivityActionRecord(metrics.lastAction, "Last Action", "Last")}
+              </div>
+            `
+          )}
+          ${renderActivitySection(
+            "Messages",
+            "Chat volume, endings, ghosted conversations, and response-time behavior.",
+            `
+              ${renderActivityMetricGrid([
+                { label: "Total Chats", value: NUMBER_FORMATTER.format(metrics.messages.totalChats) },
+                { label: "Total Messages", value: NUMBER_FORMATTER.format(metrics.messages.totalMessages) },
+                { label: "Messages Received", value: NUMBER_FORMATTER.format(metrics.messages.received) },
+                { label: "Messages Sent", value: NUMBER_FORMATTER.format(metrics.messages.sent) },
+                { label: "Chats Ended By User", value: NUMBER_FORMATTER.format(metrics.messages.endedChats) },
+                { label: "Chats Awaiting User", value: NUMBER_FORMATTER.format(metrics.messages.ghostedChats) },
+                { label: "Longest Rapid Chat", value: longestChat ? `${formatDurationPrecise(longestChat.durationSeconds)} | ${threadDisplayLabel(longestChat.thread)}` : "Unavailable" },
+                { label: "Rapid Chat Items", value: longestChat ? NUMBER_FORMATTER.format(longestChat.count) : "0" },
+                { label: "User Avg Response", value: formatDurationPrecise(metrics.messages.userResponseStats.average) },
+                { label: "User Median Response", value: formatDurationPrecise(metrics.messages.userResponseStats.median) },
+                { label: "Colleague Avg Response", value: formatDurationPrecise(metrics.messages.counterpartResponseStats.average) },
+                { label: "Colleague Median Response", value: formatDurationPrecise(metrics.messages.counterpartResponseStats.median) },
+              ])}
+              <div class="activity-record-grid">
+                ${renderFirstMessageRecord("First Chat Sent By User", metrics.messages.firstSent, firstSentStats, "Target avg response")}
+                ${renderFirstMessageRecord("First Chat Received From Originator", metrics.messages.firstReceived, firstReceivedStats, "User avg response")}
+              </div>
+              <div class="section-divider">
+                <div class="section-label">Coworker Message Snapshot</div>
+              </div>
+              ${renderActivityTargetCards(
+                metrics.messages.counterpartGroups,
+                group => {
+                  const userStats = secondsStats(group.userResponseSeconds);
+                  const counterpartStats = secondsStats(group.counterpartResponseSeconds);
+                  return [
+                    { label: "Sent", value: NUMBER_FORMATTER.format(group.sent) },
+                    { label: "Received", value: NUMBER_FORMATTER.format(group.received) },
+                    { label: "User avg response", value: formatDurationPrecise(userStats.average) },
+                    { label: "Their avg response", value: formatDurationPrecise(counterpartStats.average) },
+                  ];
+                },
+                "No chat counterpart activity was found for this day.",
+                {
+                  targetForGroup: group => group.firstThread ? ({
+                    kind: "message",
+                    threadId: group.firstThread.id,
+                    focusMessageId: group.firstMessageId || "",
+                    focusTimestamp: group.firstTimestamp || "",
+                    dateKey: localDateKey(group.firstTimestamp) || metrics.dateKey,
+                  }) : null,
+                }
+              )}
+            `
+          )}
+          ${renderActivitySection(
+            "Calls",
+            "Inbound and outbound participant activity with connected duration excluding missed calls.",
+            `
+              <div class="section-divider">
+                <div class="section-label">User Call Metrics</div>
+              </div>
+              ${renderActivityMetricGrid([
+                { label: "Calls Total", value: NUMBER_FORMATTER.format(metrics.calls.total) },
+                { label: "Calls Received", value: NUMBER_FORMATTER.format(metrics.calls.received) },
+                { label: "Calls Sent", value: NUMBER_FORMATTER.format(metrics.calls.sent) },
+                { label: "Accepted Calls", value: NUMBER_FORMATTER.format(metrics.calls.accepted) },
+                { label: "Total Duration", value: formatDurationPrecise(metrics.calls.totalDurationSeconds, "0s") },
+                { label: "Shortest Accepted Call", value: formatDurationPrecise(callStats.min) },
+                { label: "Average Accepted Call", value: formatDurationPrecise(callStats.average) },
+                { label: "Longest Accepted Call", value: formatDurationPrecise(callStats.max) },
+              ])}
+              <div class="activity-record-grid">
+                ${renderCallRecord("First Outbound Call", metrics.calls.firstOutboundCall)}
+                ${renderCallRecord("First Inbound Call", metrics.calls.firstInboundCall)}
+              </div>
+              <div class="section-divider">
+                <div class="section-label">Inbound Call Metrics</div>
+              </div>
+              ${renderActivityTargetCards(
+                metrics.calls.inboundGroups,
+                group => [
+                  { label: "Accepted", value: NUMBER_FORMATTER.format(group.accepted) },
+                  { label: "Missed", value: NUMBER_FORMATTER.format(group.missed) },
+                  { label: "Total calls", value: NUMBER_FORMATTER.format(group.total) },
+                  { label: "Total duration", value: formatDurationPrecise(group.totalDuration, "0s") },
+                ],
+                "No inbound participant call activity was found for this day.",
+                {
+                  timestampForGroup: group => fmt(group.firstTimestamp),
+                  targetForGroup: group => group.firstCallKey ? ({
+                    kind: "call",
+                    callKey: group.firstCallKey,
+                    focusTimestamp: group.firstTimestamp || "",
+                    dateKey: localDateKey(group.firstTimestamp) || metrics.dateKey,
+                    callDirection: "inbound",
+                  }) : null,
+                }
+              )}
+              <div class="section-divider">
+                <div class="section-label">Outbound Call Metrics</div>
+              </div>
+              ${renderActivityTargetCards(
+                metrics.calls.outboundGroups,
+                group => [
+                  { label: "Accepted", value: NUMBER_FORMATTER.format(group.accepted) },
+                  { label: "Missed", value: NUMBER_FORMATTER.format(group.missed) },
+                  { label: "Total calls", value: NUMBER_FORMATTER.format(group.total) },
+                  { label: "Total duration", value: formatDurationPrecise(group.totalDuration, "0s") },
+                ],
+                "No outbound participant call activity was found for this day.",
+                {
+                  timestampForGroup: group => fmt(group.firstTimestamp),
+                  targetForGroup: group => group.firstCallKey ? ({
+                    kind: "call",
+                    callKey: group.firstCallKey,
+                    focusTimestamp: group.firstTimestamp || "",
+                    dateKey: localDateKey(group.firstTimestamp) || metrics.dateKey,
+                    callDirection: "outbound",
+                  }) : null,
+                }
+              )}
+            `
+          )}
+          ${renderActivitySection(
+            "Meetings",
+            "Scheduled meetings and attendance metrics inferred from Teams meeting call records.",
+            `
+              ${renderActivityMetricGrid([
+                { label: "Meetings Scheduled", value: NUMBER_FORMATTER.format(metrics.meetings.total) },
+                { label: "Meetings Attended", value: NUMBER_FORMATTER.format(metrics.meetings.attended) },
+                { label: "Meetings Missed", value: NUMBER_FORMATTER.format(metrics.meetings.missed) },
+                { label: "Total Meeting Time", value: formatDurationPrecise(metrics.meetings.totalDurationSeconds, "0s") },
+                { label: "Shortest Attended Meeting", value: formatDurationPrecise(meetingStats.min) },
+                { label: "Average Attended Meeting", value: formatDurationPrecise(meetingStats.average) },
+                { label: "Median Attended Meeting", value: formatDurationPrecise(meetingStats.median) },
+                { label: "Longest Attended Meeting", value: formatDurationPrecise(meetingStats.max) },
+              ])}
+              <div class="activity-record-grid">
+                ${renderMeetingRecord("First Meeting", metrics.meetings.first)}
+                ${renderMeetingRecord("Last Meeting", metrics.meetings.last)}
+              </div>
+            `
+          )}
+        </div>
+      `;
+      initActivityTargetLinks(contentPanel);
+      const openMessagesForDay = contentPanel.querySelector(".open-activity-messages");
+      if (openMessagesForDay) {
+        openMessagesForDay.addEventListener("click", () => {
+          state.view = "messages";
+          clearMessageSearchState();
+          state.category = "";
+          state.messageDateFrom = metrics.dateKey;
+          state.messageDateTo = metrics.dateKey;
+          state.threadDateFrom = metrics.dateKey;
+          state.threadDateTo = metrics.dateKey;
+          state.messageViewFilter = "all";
+          renderView();
+          scrollAllToTop();
+        });
+      }
+      const openCallsForDay = contentPanel.querySelector(".open-activity-calls");
+      if (openCallsForDay) {
+        openCallsForDay.addEventListener("click", () => {
+          state.view = "calls";
+          state.callSearch = "";
+          state.callGroup = "";
+          state.callDirection = "";
+          state.callDateFrom = metrics.dateKey;
+          state.callDateTo = metrics.dateKey;
+          renderView();
+          scrollAllToTop();
+        });
+      }
+      const toggleExport = contentPanel.querySelector(".toggle-activity-export");
+      if (toggleExport) {
+        toggleExport.addEventListener("click", () => {
+          state.activityExportOpen = !state.activityExportOpen;
+          if (!state.activityExportFrom) state.activityExportFrom = metrics.dateKey;
+          if (!state.activityExportTo) state.activityExportTo = metrics.dateKey;
+          renderView();
+        });
+      }
+      const exportFrom = contentPanel.querySelector(".activity-export-from");
+      if (exportFrom) {
+        exportFrom.addEventListener("change", event => {
+          state.activityExportFrom = normalizeDateKeyInput(event.target.value, metrics.dateKey);
+        });
+      }
+      const exportTo = contentPanel.querySelector(".activity-export-to");
+      if (exportTo) {
+        exportTo.addEventListener("change", event => {
+          state.activityExportTo = normalizeDateKeyInput(event.target.value, state.activityExportFrom || metrics.dateKey);
+        });
+      }
+      const downloadExport = contentPanel.querySelector(".download-activity-export");
+      if (downloadExport) {
+        downloadExport.addEventListener("click", () => {
+          const fromValue = normalizeDateKeyInput((contentPanel.querySelector(".activity-export-from") || {}).value, metrics.dateKey);
+          const toValue = normalizeDateKeyInput((contentPanel.querySelector(".activity-export-to") || {}).value, fromValue);
+          state.activityExportFrom = fromValue;
+          state.activityExportTo = toValue;
+          downloadActivityCsv(fromValue, toValue);
+        });
+      }
+    }
+
     function searchMessageText(thread, message) {
       if (MESSAGE_SEARCH_TEXT_CACHE.has(message)) {
         return MESSAGE_SEARCH_TEXT_CACHE.get(message);
@@ -5813,6 +7791,10 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function renderContent() {
+      if (state.view === "activity") {
+        renderActivityPanel();
+        return;
+      }
       if (state.view === "calls") {
         renderCallPanel();
         return;
@@ -5834,16 +7816,23 @@ HTML_TEMPLATE = """<!doctype html>
       window.clearTimeout(scheduleMessageSearchRender.timer);
       window.clearTimeout(scheduleCallSearchRender.timer);
       const showingMessages = state.view === "messages";
+      const showingCalls = state.view === "calls";
+      const showingActivity = state.view === "activity";
       viewMessages.classList.toggle("active", showingMessages);
-      viewCalls.classList.toggle("active", !showingMessages);
+      viewCalls.classList.toggle("active", showingCalls);
+      viewActivity.classList.toggle("active", showingActivity);
       messagesTools.classList.toggle("hidden", !showingMessages);
-      callsTools.classList.toggle("hidden", showingMessages);
+      callsTools.classList.toggle("hidden", !showingCalls);
+      activityTools.classList.toggle("hidden", !showingActivity);
       threadList.classList.toggle("hidden", !showingMessages);
-      callList.classList.toggle("hidden", showingMessages);
+      callList.classList.toggle("hidden", !showingCalls);
+      activityList.classList.toggle("hidden", !showingActivity);
       if (showingMessages) {
         renderMessageList();
-      } else {
+      } else if (showingCalls) {
         renderCallList();
+      } else {
+        renderActivityList();
       }
       renderContent();
       syncInputsFromState();
@@ -5869,6 +7858,17 @@ HTML_TEMPLATE = """<!doctype html>
       state.focusTimestamp = null;
       state.focusSearchQuery = "";
       renderView();
+    });
+
+    viewActivity.addEventListener("click", () => {
+      state.view = "activity";
+      ensureActivityDate();
+      state.focusMessageId = null;
+      state.focusCallKey = null;
+      state.focusTimestamp = null;
+      state.focusSearchQuery = "";
+      renderView();
+      scrollAllToTop();
     });
 
     threadList.addEventListener("click", event => {
@@ -5977,6 +7977,76 @@ HTML_TEMPLATE = """<!doctype html>
       scrollAllToTop();
     });
 
+    if (activityMonth) {
+      activityMonth.addEventListener("change", event => {
+        const monthKey = event.target.value || monthKeyFromDateKey(todayDateKey());
+        state.activityMonth = monthKey;
+        if (monthKeyFromDateKey(state.activityDate) !== monthKey) {
+          state.activityDate = bestActivityDateForMonth(monthKey);
+        }
+        renderView();
+        scrollAllToTop();
+      });
+    }
+
+    if (activityPrevMonth) {
+      activityPrevMonth.addEventListener("click", () => {
+        state.activityMonth = shiftMonthKey(state.activityMonth || monthKeyFromDateKey(state.activityDate) || monthKeyFromDateKey(todayDateKey()), -1);
+        if (monthKeyFromDateKey(state.activityDate) !== state.activityMonth) {
+          state.activityDate = bestActivityDateForMonth(state.activityMonth);
+        }
+        renderView();
+        scrollAllToTop();
+      });
+    }
+
+    if (activityNextMonth) {
+      activityNextMonth.addEventListener("click", () => {
+        state.activityMonth = shiftMonthKey(state.activityMonth || monthKeyFromDateKey(state.activityDate) || monthKeyFromDateKey(todayDateKey()), 1);
+        if (monthKeyFromDateKey(state.activityDate) !== state.activityMonth) {
+          state.activityDate = bestActivityDateForMonth(state.activityMonth);
+        }
+        renderView();
+        scrollAllToTop();
+      });
+    }
+
+    if (activityWorkStart) {
+      activityWorkStart.addEventListener("change", event => {
+        state.activityWorkStart = normalizeTimeInput(event.target.value, "08:00");
+        resetActivityCaches();
+        renderView();
+        scrollAllToTop();
+      });
+    }
+
+    if (activityWorkEnd) {
+      activityWorkEnd.addEventListener("change", event => {
+        state.activityWorkEnd = normalizeTimeInput(event.target.value, "17:00");
+        resetActivityCaches();
+        renderView();
+        scrollAllToTop();
+      });
+    }
+
+    for (const input of activityWorkdayInputs) {
+      input.addEventListener("change", () => {
+        state.activityWorkDays = activityWorkdayInputs
+          .filter(candidate => candidate.checked)
+          .map(candidate => String(candidate.value))
+          .join(",");
+        resetActivityCaches();
+        renderView();
+      });
+    }
+
+    if (activityToday) {
+      activityToday.addEventListener("click", () => {
+        selectActivityDate(todayDateKey());
+        scrollAllToTop();
+      });
+    }
+
     if (sidebarListWrap) {
       sidebarListWrap.addEventListener("scroll", scheduleSyncScrollTopButtons, { passive: true });
     }
@@ -6018,6 +8088,16 @@ HTML_TEMPLATE = """<!doctype html>
       if (filterKey === "call-date") {
         state.callDateFrom = "";
         state.callDateTo = "";
+      }
+      if (filterKey === "activity-date") {
+        selectActivityDate(todayDateKey());
+        return;
+      }
+      if (filterKey === "activity-window") {
+        state.activityWorkStart = "08:00";
+        state.activityWorkEnd = "17:00";
+        state.activityWorkDays = "1,2,3,4,5";
+        resetActivityCaches();
       }
       renderView();
     });
@@ -6216,7 +8296,7 @@ CALL_FIELDS = (
     "target_phone_number",
     "user_participation",
 )
-CALL_PARTICIPANT_SESSION_FIELDS = ("id", "display_name")
+CALL_PARTICIPANT_SESSION_FIELDS = ("id", "display_name", "duration_seconds")
 
 
 def pick_fields(payload: dict | None, allowed_fields: tuple[str, ...]) -> dict:

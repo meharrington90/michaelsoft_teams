@@ -24,7 +24,6 @@ if errorlevel 1 (
 call "%VENV_PY%" "%PYTHON_DIR%\run_teams_pipeline.py" --open-browser %*
 set "STATUS=%ERRORLEVEL%"
 echo.
-pause
 exit /b %STATUS%
 
 :ensure_runtime
@@ -62,7 +61,6 @@ echo Runtime creation failed.
 echo This launcher can use a local Python install or create a self-contained
 echo runtime with uv when Python is not available.
 echo.
-pause
 exit /b 1
 
 :install_failed
@@ -70,5 +68,4 @@ echo Dependency installation failed.
 echo This launcher installs ccl_chromium_reader from GitHub source archives.
 echo Network access to github.com and codeload.github.com is required.
 echo.
-pause
 exit /b 1
